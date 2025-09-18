@@ -1,3 +1,9 @@
-name = "mayor-smart-mirror"
-pages_build_output_dir = "./"   # 정적 루트
-compatibility_date = "2024-09-01"
+name = "mayor-mirror"
+main = "worker.js"
+compatibility_date = "2024-05-01"
+
+[vars]
+# 여기에 값을 직접 넣지 말고, 대시보드에서 설정하는 걸 권장합니다.
+# 단, 로컬 wrangler dev 테스트용으로는 임시값 가능
+# GEMINI_API_KEY = "xxxxxxxx"
+# WEATHER_API_KEY = "xxxxxxxx"
