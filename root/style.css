@@ -1,1 +1,29 @@
-
+body {
+  margin: 0;
+  font-family: 'Pretendard', system-ui, sans-serif;
+  background: black;
+  color: white;
+}
+#app {
+  padding: 1rem;
+}
+header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.widget {
+  background: rgba(255, 255, 255, 0.1);
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 12px;
+}
+#chat-box {
+  height: 200px;
+  overflow-y: auto;
+  background: rgba(0,0,0,0.4);
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+#chat-input {
+  width: 70%;
+}
