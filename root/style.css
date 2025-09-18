@@ -1,29 +1,63 @@
-body {
-  margin: 0;
-  font-family: 'Pretendard', system-ui, sans-serif;
-  background: black;
-  color: white;
+:root{
+  --bg:#0b0f19; --panel:#101626; --muted:#8aa0c2; --text:#e8f0ff; --primary:#6aa7ff; --accent:#78f5c7; --danger:#ff6a6a;
+  --radius:16px;
 }
-#app {
-  padding: 1rem;
-}
-header {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-.widget {
-  background: rgba(255, 255, 255, 0.1);
-  margin: 1rem 0;
-  padding: 1rem;
-  border-radius: 12px;
-}
-#chat-box {
-  height: 200px;
-  overflow-y: auto;
-  background: rgba(0,0,0,0.4);
-  padding: 0.5rem;
-  border-radius: 8px;
-}
-#chat-input {
-  width: 70%;
-}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif}
+
+.topbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(16,22,38,.7);backdrop-filter:blur(8px);border-bottom:1px solid #1c2440}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .logo-dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--primary))}
+.brand strong{font-weight:800}
+.brand em{font-style:normal;color:var(--muted);font-size:.9rem}
+.menu{display:flex;gap:8px;align-items:center}
+.nav-btn{background:transparent;border:1px solid #223055;color:var(--text);padding:8px 12px;border-radius:999px}
+.nav-btn:hover{border-color:#2d3c66}
+.icon-btn{border:1px solid #223055;background:transparent;padding:8px 10px;border-radius:10px;color:var(--text)}
+.pill-btn{background:linear-gradient(135deg,#425fe0,#2dc8a0);border:none;color:#fff;padding:9px 14px;border-radius:999px;font-weight:700}
+.pill-btn.ghost{background:transparent;border:1px solid #223055;color:var(--text)}
+
+.container{max-width:1100px;margin:24px auto;padding:0 16px}
+.tab{display:none}
+.tab.active{display:block}
+
+.hero{display:flex;align-items:center;justify-content:space-between;gap:16px;background:linear-gradient(180deg,#0c1324,#0b0f19);border:1px solid #1c2440;border-radius:var(--radius);padding:24px}
+.hero h1{margin:0;font-size:1.5rem}
+.time #clock{font-size:44px;font-weight:900}
+.time #date{color:var(--muted);text-align:right;margin-top:4px}
+
+.grid{margin-top:16px;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+
+.card{background:var(--panel);border:1px solid #1c2440;border-radius:var(--radius);padding:16px}
+.card-hd{font-weight:800;margin-bottom:10px}
+.rows .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #1e2b4d}
+.rows .row:last-child{border-bottom:0}
+
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kpi{background:#0c1428;border:1px solid #1c2440;border-radius:12px;padding:12px;text-align:center}
+.kpi span{display:block;color:var(--muted);font-size:.85rem}
+.kpi strong{font-size:1.4rem}
+
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+.act-btn{background:#0d1730;border:1px solid #23325a;color:#dfe7ff;padding:10px 12px;border-radius:12px}
+.act-btn:hover{border-color:#2f4377}
+.log{margin-top:12px;color:var(--muted);font-size:.9rem;max-height:120px;overflow:auto;border-top:1px solid #1c2440;padding-top:8px}
+
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.list{display:flex;flex-direction:column;gap:8px}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid #1c2440;border-radius:12px;background:#0d1428}
+.badge{background:#0f1d3f;border:1px solid #223166;color:#a8c0ff;border-radius:999px;padding:2px 8px;margin-left:6px;font-size:.8rem}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+
+.chat-box{min-height:240px;border:1px solid #1c2440;border-radius:12px;padding:12px;background:#0c1428;overflow:auto}
+.msg{display:flex;gap:8px;margin:8px 0}
+.msg.me{justify-content:flex-end}
+.bubble{max-width:70%;padding:10px;border-radius:12px;border:1px solid #223055;background:#0e1936}
+.msg.me .bubble{background:#1b274a}
+.chat-input{display:flex;gap:8px;margin-top:10px}
+.chat-input input{flex:1;border:1px solid #223055;background:#0c1428;color:#e8f0ff;border-radius:10px;padding:10px}
+
+.footer{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;color:var(--muted);border-top:1px solid #1c2440;margin-top:24px}
