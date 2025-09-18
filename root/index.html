@@ -1,34 +1,163 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mayor Smart Mirror</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="manifest" href="manifest.json" />
+  <meta charset="utf-8" />
+  <title>스마트미러 PRO · 단일품</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- ✅ CSP: 한 줄로! (줄바꿈/들여쓰기 금지) -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; connect-src 'self' https: wss:; frame-src https://meet.jit.si;">
+
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E🪞%3C/text%3E%3C/svg%3E" />
+  <meta name="theme-color" content="#0b0f19"/>
+
+  <link rel="stylesheet" href="/assets/css/mirror.css" />
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1>🪞 스마트미러 PRO</h1>
-      <p id="clock">--:--</p>
-    </header>
+  <header class="topbar">
+    <div class="brand">스마트미러 <span class="tag">PRO</span></div>
+    <div class="top-actions">
+      <button id="btn-full" title="전체화면">⤢</button>
+      <button id="btn-theme" title="테마 전환">🌗</button>
+      <button id="btn-settings" title="설정">⚙️</button>
+    </div>
+  </header>
 
-    <main>
-      <section class="widget">
-        <h2>🌦 날씨</h2>
-        <div id="weather">로딩 중...</div>
-      </section>
+  <!-- 고급 메인 메뉴 -->
+  <nav class="mega-menu">
+    <a class="card" data-action="dashboard">
+      <div class="icon">📊</div>
+      <div class="title">대시보드</div>
+      <div class="desc">시계/지표/메모 한 눈에</div>
+    </a>
+    <a class="card" data-action="ai">
+      <div class="icon">🤖</div>
+      <div class="title">AI 대화</div>
+      <div class="desc">지시/요약/보고서 생성</div>
+    </a>
+    <a class="card" data-action="weather">
+      <div class="icon">⛅</div>
+      <div class="title">날씨·재난</div>
+      <div class="desc">기상청(태풍/지진) 연동</div>
+    </a>
+    <a class="card" data-action="meeting">
+      <div class="icon">🎥</div>
+      <div class="title">화상회의</div>
+      <div class="desc">Jitsi 원클릭 연결</div>
+    </a>
+  </nav>
 
-      <section class="widget">
-        <h2>🤖 AI 비서</h2>
-        <div id="chat-box"></div>
-        <input id="chat-input" placeholder="AI에게 말해보세요" />
-        <button onclick="sendMessage()">보내기</button>
-      </section>
-    </main>
-  </div>
+  <main class="grid">
+    <!-- 시계/KPI/메모 -->
+    <section class="panel clock">
+      <div id="clock-time" class="time">--:--</div>
+      <div id="clock-sec" class="sec">--</div>
+      <div id="clock-date" class="date">----</div>
+      <div class="kpis">
+        <div class="kpi"><div class="k">일정</div><div id="kpi-agenda" class="v">--건</div></div>
+        <div class="kpi"><div class="k">할 일</div><div id="kpi-todos" class="v">--건</div></div>
+        <div class="kpi"><div class="k">민원</div><div id="kpi-inc" class="v">--건</div></div>
+        <div class="kpi"><div class="k">수면</div><div id="kpi-sleep" class="v">--</div></div>
+      </div>
+      <div class="notes">
+        <div class="notes-head">
+          <span>메모</span>
+          <div class="notes-actions">
+            <button id="btn-print">🖨️</button>
+            <button id="btn-report">⬇️</button>
+          </div>
+        </div>
+        <textarea id="memo" placeholder="지시/메모를 적으세요"></textarea>
+      </div>
+    </section>
 
-  <script src="assets/js/mirror.js"></script>
+    <!-- AI 대화 -->
+    <section class="panel ai">
+      <div class="panel-head">
+        <h3>AI 비서</h3>
+        <span class="badge" id="ai-status">오프라인(모의)</span>
+      </div>
+      <div id="chat" class="chat"></div>
+      <div class="composer">
+        <input id="chat-input" placeholder="예) 오늘 일정 요약 / 보고서 초안 작성" />
+        <button id="btn-mic" title="음성">🎙️</button>
+        <button id="btn-send">보내기</button>
+      </div>
+      <div class="hints">
+        <button class="hint">메모에 '수분 알림 30분' 추가</button>
+        <button class="hint">회의록 요약해줘</button>
+        <button class="hint">민원 현황 브리핑</button>
+      </div>
+    </section>
+
+    <!-- 날씨/재난 -->
+    <section class="panel weather">
+      <div class="panel-head">
+        <h3>날씨 · 재난</h3>
+        <button id="btn-w-refresh">새로고침</button>
+      </div>
+      <div class="wx-grid">
+        <div class="wx">
+          <div class="wx-k">상태</div><div id="wx-cond" class="wx-v">--</div>
+          <div class="wx-k">기온</div><div id="wx-temp" class="wx-v">--℃</div>
+          <div class="wx-k">습도</div><div id="wx-humi" class="wx-v">--%</div>
+          <div class="wx-k">풍속</div><div id="wx-wind" class="wx-v">-- m/s</div>
+          <div class="wx-k">PM2.5</div><div id="wx-pm25" class="wx-v">-- ㎍/㎥</div>
+          <div class="wx-k">PM10</div><div id="wx-pm10" class="wx-v">-- ㎍/㎥</div>
+        </div>
+        <div class="alert-box" id="wx-alert">특보 없음</div>
+      </div>
+    </section>
+
+    <!-- 화상회의 -->
+    <section class="panel meeting">
+      <div class="panel-head">
+        <h3>화상회의</h3>
+        <div class="meet-actions">
+          <input id="meet-room" value="MayorRoom" />
+          <button id="btn-meet-open">새 창</button>
+          <button id="btn-meet-embed">임베드</button>
+        </div>
+      </div>
+      <div class="meet-embed-wrap">
+        <iframe id="meet-iframe" allow="camera; microphone; fullscreen" title="Jitsi Meeting" hidden></iframe>
+      </div>
+    </section>
+  </main>
+
+  <!-- 설정 모달 -->
+  <dialog id="dlg-settings">
+    <form method="dialog" class="settings">
+      <h3>설정</h3>
+      <label>테마
+        <select id="set-theme">
+          <option value="dark">다크</option>
+          <option value="light">라이트</option>
+        </select>
+      </label>
+      <label>Gemini API Key
+        <input id="set-gemini" placeholder="AI 대화용 (선택)" />
+      </label>
+      <label>기상청 서비스키
+        <input id="set-kma" placeholder="날씨/재난용 (선택)" />
+      </label>
+      <label>지역(예: 충남 논산)
+        <input id="set-region" placeholder="표시용 문자열" />
+      </label>
+      <div class="settings-actions">
+        <button id="btn-save">저장</button>
+        <button id="btn-close">닫기</button>
+      </div>
+      <p class="help">* 키를 비워두면 모의데이터로 동작합니다. 키는 브라우저에 <b>로컬 저장</b>됩니다.</p>
+    </form>
+  </dialog>
+
+  <script type="module" src="/assets/js/mirror.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/assets/js/worker.js').catch(()=>{});
+    }
+  </script>
 </body>
 </html>
