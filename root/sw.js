@@ -1,15 +1,1 @@
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open("mirror-cache").then((cache) => {
-      return cache.addAll(["/", "/index.html", "/style.css", "/assets/js/mirror.js"]);
-    })
-  );
-});
-
-self.addEventListener("fetch", (e) => {
-  e.respondWith(
-    caches.match(e.request).then((resp) => {
-      return resp || fetch(e.request);
-    })
-  );
-});
+// 사용하지 않습니다. 실제 서비스워커는 service-worker.js 입니다.
