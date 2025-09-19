@@ -1,5 +1,5 @@
 // =======================
-// Gemini AI 호출 함수
+// Gemini AI 호출
 // =======================
 export async function askGemini(prompt: string): Promise<string> {
   try {
@@ -8,10 +8,9 @@ export async function askGemini(prompt: string): Promise<string> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
     });
-
-    if (!res.ok) throw new Error("Gemini API 호출 실패");
+    if (!res.ok) throw new Error(`Gemini API 호출 실패: ${res.status}`);
     const data = await res.json();
-    return data.text || "응답 없음";
+    return (data.text ?? "").toString().trim() || "응답이 비었습니다.";
   } catch (err) {
     console.error("Gemini 호출 오류:", err);
     return "AI 호출 중 문제가 발생했습니다.";
@@ -19,18 +18,13 @@ export async function askGemini(prompt: string): Promise<string> {
 }
 
 // =======================
-// 기상청 날씨/태풍/지진 API 호출 함수
+// 기상청 날씨 API 호출 (좌표 nx,ny + 날짜/시간: 'YYYYMMDD','HHMM')
 // =======================
-export async function fetchWeather(
-  nx: number,
-  ny: number,
-  date: string,
-  time: string
-) {
+export async function fetchWeather(nx: number, ny: number, date: string, time: string) {
   try {
     const url = `/api/weather?nx=${nx}&ny=${ny}&date=${date}&time=${time}&type=JSON`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error("기상청 API 호출 실패");
+    if (!res.ok) throw new Error(`기상청 API 호출 실패: ${res.status}`);
     return res.json();
   } catch (err) {
     console.error("기상청 호출 오류:", err);
@@ -39,31 +33,32 @@ export async function fetchWeather(
 }
 
 // =======================
-// 음성합성(TTS) 유틸
+// 브라우저 TTS (특수문자/이모지 제거 + 청크 낭독 + 일시정지/재개/정지)
 // =======================
 
-// 텍스트 전처리: 특수문자/이모지/URL 제거
+// 특수문자/이모지/URL 제거
 function cleanTextForSpeech(raw: string): string {
   if (!raw) return "";
   return raw
     .normalize("NFKD")
-    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/https?:\/\/\S+/g, " ") // URL 제거
     .replace(
       /[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji}\u2600-\u27BF]/gu,
       " "
-    )
-    .replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s]/g, " ")
+    ) // 이모지 제거
+    .replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s.,!?~…:;()-]/g, " ") // 너무 과한 특수문자 제거
     .replace(/\s{2,}/g, " ")
     .trim();
 }
 
-// 긴 문장 나누기 (브라우저 TTS 안정성 확보용)
+// 긴 텍스트를 안정적으로 읽도록 분할
 function chunkText(text: string, maxLen = 180): string[] {
   const words = text.split(/\s+/);
   const chunks: string[] = [];
   let buf: string[] = [];
   for (const w of words) {
-    if ((buf.join(" ") + " " + w).trim().length > maxLen) {
+    const next = (buf.join(" ") + " " + w).trim();
+    if (next.length > maxLen) {
       if (buf.length) chunks.push(buf.join(" ").trim());
       buf = [w];
     } else {
@@ -77,9 +72,8 @@ function chunkText(text: string, maxLen = 180): string[] {
 let _ttsQueue: string[] = [];
 let _speaking = false;
 
-// 말하기 시작
-export async function speakText(text: string) {
-  stopSpeech();
+export function speakText(text: string) {
+  stopSpeech(); // 기존 재생 초기화
   const clean = cleanTextForSpeech(text);
   if (!clean) return;
   _ttsQueue = chunkText(clean);
@@ -97,36 +91,25 @@ function playNextChunk() {
   u.lang = "ko-KR";
   u.rate = 1.0;
   u.pitch = 1.0;
-
   u.onend = () => playNextChunk();
   u.onerror = () => playNextChunk();
-
   speechSynthesis.speak(u);
 }
 
-// 제어 버튼용
 export function pauseSpeech() {
-  if (speechSynthesis.speaking && !speechSynthesis.paused) {
-    speechSynthesis.pause();
-  }
+  if (speechSynthesis.speaking && !speechSynthesis.paused) speechSynthesis.pause();
 }
-
 export function resumeSpeech() {
-  if (speechSynthesis.paused) {
-    speechSynthesis.resume();
-  }
+  if (speechSynthesis.paused) speechSynthesis.resume();
 }
-
 export function stopSpeech() {
-  if (speechSynthesis.speaking || speechSynthesis.paused) {
-    speechSynthesis.cancel();
-  }
+  if (speechSynthesis.speaking || speechSynthesis.paused) speechSynthesis.cancel();
   _ttsQueue = [];
   _speaking = false;
 }
 
 // =======================
-// 전역 노출 (index.html 버튼에서 직접 호출 가능하게)
+// 전역 노출: index.html에서 직접 호출 가능
 // =======================
 ;(window as any).askGemini = askGemini;
 ;(window as any).fetchWeather = fetchWeather;
