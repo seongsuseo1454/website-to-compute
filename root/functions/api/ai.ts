@@ -1,202 +1,136 @@
-// functions/api/ai.ts
-// Cloudflare Pages Functions (TypeScript)
-// Google Gemini 프록시: 텍스트 입력 → 텍스트/툴스트립 응답
-// - CORS 허용
-// - 표준 에러 포맷
-// - 모델/시스템프롬프트/온도/토큰/JSON 출력 모드 지원
-
-type Ctx = {
-  request: Request;
-  env: { GEMINI_API_KEY?: string };
-};
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-const j = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data, null, 2), {
-    status,
-    headers: { "Content-Type": "application/json; charset=utf-8", ...CORS },
-  });
-
-const bad = (msg: string, status = 400, extra?: Record<string, any>) => j({ ok: false, error: msg, ...extra }, status);
-
-export const onRequestOptions: PagesFunction = async () =>
-  new Response(null, { status: 204, headers: CORS });
-
-export const onRequestGet: PagesFunction = async (ctx: Ctx) => handle(ctx);
-export const onRequestPost: PagesFunction = async (ctx: Ctx) => handle(ctx);
-
-async function handle({ request, env }: Ctx): Promise<Response> {
+// =======================
+// Gemini AI 호출 함수
+// =======================
+export async function askGemini(prompt: string): Promise<string> {
   try {
-    const key = env.GEMINI_API_KEY;
-    if (!key) return bad("Missing env.GEMINI_API_KEY. Cloudflare Pages 환경변수에 등록하세요.", 500);
-
-    // ---- 입력 수집 (GET 쿼리 또는 POST JSON) ----
-    const url = new URL(request.url);
-    const isPost = request.method === "POST";
-    const body = isPost ? await safeJson(request) : {};
-    const qp = url.searchParams;
-
-    const model =
-      (qp.get("model") || (body as any)?.model || "gemini-2.0-flash") as string;
-
-    const prompt =
-      (qp.get("prompt") || (body as any)?.prompt || "").toString();
-
-    const system =
-      (qp.get("system") || (body as any)?.system || "").toString();
-
-    const temperature = asNum(qp.get("temperature"), (body as any)?.temperature, 0.7);
-    const maxTokens = asInt(qp.get("maxTokens"), (body as any)?.maxTokens, 1024);
-    const jsonMode = asBool(qp.get("json"), (body as any)?.json, false);
-
-    if (!prompt) return bad("prompt is required");
-
-    // ---- Gemini REST 요청 페이로드 구성 ----
-    // Google AI Studio REST:
-    // POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-      model
-    )}:generateContent?key=${encodeURIComponent(key)}`;
-
-    // system 프롬프트는 "system_instruction" 또는 첫 메시지에 주입
-    const contents: any[] = [];
-    if (system) {
-      contents.push({
-        role: "user",
-        parts: [{ text: `SYSTEM:\n${system}` }],
-      });
-    }
-    contents.push({
-      role: "user",
-      parts: [{ text: prompt }],
-    });
-
-    const genConfig: Record<string, any> = {
-      temperature,
-      maxOutputTokens: maxTokens,
-    };
-    if (jsonMode) {
-      genConfig.responseMimeType = "application/json";
-    }
-
-    const payload = {
-      contents,
-      generationConfig: genConfig,
-    };
-
-    // ---- 호출 ----
-    const res = await fetch(endpoint, {
+    const res = await fetch("/api/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ prompt }),
     });
 
-    const text = await res.text(); // 우선 문자열로
-    let parsed: any = null;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      // JSON 파싱 실패 시 원문 그대로 반환
-      return j(
-        {
-          ok: false,
-          error: "Gemini response is not JSON",
-          status: res.status,
-          model,
-          request: { promptSample: prompt.slice(0, 140), temperature, maxTokens, jsonMode },
-          raw: text.slice(0, 2000),
-        },
-        res.ok ? 200 : 502
-      );
-    }
-
-    if (!res.ok) {
-      return j(
-        {
-          ok: false,
-          error: "Gemini HTTP error",
-          status: res.status,
-          model,
-          request: { temperature, maxTokens, jsonMode },
-          response: parsed,
-        },
-        502
-      );
-    }
-
-    // ---- 텍스트 추출 (일반 텍스트 모드) ----
-    // v1beta 응답: candidates[0].content.parts[].text
-    let combinedText = "";
-    try {
-      const cand = parsed.candidates?.[0];
-      const parts = cand?.content?.parts || [];
-      combinedText = parts.map((p: any) => p.text || "").join("");
-    } catch {
-      /* noop */
-    }
-
-    return j({
-      ok: true,
-      model,
-      used: { temperature, maxTokens, jsonMode },
-      text: combinedText || null,
-      response: parsed, // 원문도 함께 (디버깅/고급용)
-    });
-  } catch (e: any) {
-    return bad(`Unhandled error: ${e?.message || String(e)}`, 500);
+    if (!res.ok) throw new Error("Gemini API 호출 실패");
+    const data = await res.json();
+    return data.text || "응답 없음";
+  } catch (err) {
+    console.error("Gemini 호출 오류:", err);
+    return "AI 호출 중 문제가 발생했습니다.";
   }
 }
 
-async function safeJson(req: Request) {
+// =======================
+// 기상청 날씨/태풍/지진 API 호출 함수
+// =======================
+export async function fetchWeather(
+  nx: number,
+  ny: number,
+  date: string,
+  time: string
+) {
   try {
-    return await req.json();
-  } catch {
-    return {};
+    const url = `/api/weather?nx=${nx}&ny=${ny}&date=${date}&time=${time}&type=JSON`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("기상청 API 호출 실패");
+    return res.json();
+  } catch (err) {
+    console.error("기상청 호출 오류:", err);
+    return { error: "날씨 데이터를 가져오지 못했습니다." };
   }
 }
-function asNum(...vals: any[]) {
-  for (const v of vals) {
-    if (v === undefined || v === null || v === "") continue;
-    const n = Number(v);
-    if (!Number.isNaN(n)) return n;
-  }
-  return undefined;
+
+// =======================
+// 음성합성(TTS) 유틸
+// =======================
+
+// 텍스트 전처리: 특수문자/이모지/URL 제거
+function cleanTextForSpeech(raw: string): string {
+  if (!raw) return "";
+  return raw
+    .normalize("NFKD")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(
+      /[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji}\u2600-\u27BF]/gu,
+      " "
+    )
+    .replace(/[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s]/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
-function asInt(...vals: any[]) {
-  const n = asNum(...vals);
-  return typeof n === "number" ? Math.floor(n) : undefined;
-}
-function asBool(...vals: any[]) {
-  for (const v of vals) {
-    if (typeof v === "boolean") return v;
-    if (typeof v === "string") {
-      const s = v.toLowerCase();
-      if (["1", "true", "yes", "y"].includes(s)) return true;
-      if (["0", "false", "no", "n"].includes(s)) return false;
+
+// 긴 문장 나누기 (브라우저 TTS 안정성 확보용)
+function chunkText(text: string, maxLen = 180): string[] {
+  const words = text.split(/\s+/);
+  const chunks: string[] = [];
+  let buf: string[] = [];
+  for (const w of words) {
+    if ((buf.join(" ") + " " + w).trim().length > maxLen) {
+      if (buf.length) chunks.push(buf.join(" ").trim());
+      buf = [w];
+    } else {
+      buf.push(w);
     }
   }
-  return false;
-        }
-// 텍스트 정제 함수 (특수문자 전체 제거)
-function cleanTextForSpeech(text: string): string {
-  return text.replace(/[^가-힣a-zA-Z0-9\s]/g, "");  
-  // → 한글, 영어, 숫자, 공백만 남기고 전부 삭제
+  if (buf.length) chunks.push(buf.join(" ").trim());
+  return chunks;
 }
 
-// 음성 합성 호출 부분
-async function speakText(text: string) {
-  const cleanText = cleanTextForSpeech(text);
+let _ttsQueue: string[] = [];
+let _speaking = false;
 
-  const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.lang = "ko-KR";  // 한국어
-  utterance.rate = 1.0;      // 말하기 속도
-  utterance.pitch = 1.0;     // 목소리 톤
-
-  speechSynthesis.speak(utterance);
+// 말하기 시작
+export async function speakText(text: string) {
+  stopSpeech();
+  const clean = cleanTextForSpeech(text);
+  if (!clean) return;
+  _ttsQueue = chunkText(clean);
+  _speaking = true;
+  playNextChunk();
 }
-   
+
+function playNextChunk() {
+  if (!_speaking || _ttsQueue.length === 0) {
+    _speaking = false;
+    return;
+  }
+  const chunk = _ttsQueue.shift()!;
+  const u = new SpeechSynthesisUtterance(chunk);
+  u.lang = "ko-KR";
+  u.rate = 1.0;
+  u.pitch = 1.0;
+
+  u.onend = () => playNextChunk();
+  u.onerror = () => playNextChunk();
+
+  speechSynthesis.speak(u);
+}
+
+// 제어 버튼용
+export function pauseSpeech() {
+  if (speechSynthesis.speaking && !speechSynthesis.paused) {
+    speechSynthesis.pause();
+  }
+}
+
+export function resumeSpeech() {
+  if (speechSynthesis.paused) {
+    speechSynthesis.resume();
+  }
+}
+
+export function stopSpeech() {
+  if (speechSynthesis.speaking || speechSynthesis.paused) {
+    speechSynthesis.cancel();
+  }
+  _ttsQueue = [];
+  _speaking = false;
+}
+
+// =======================
+// 전역 노출 (index.html 버튼에서 직접 호출 가능하게)
+// =======================
+;(window as any).askGemini = askGemini;
+;(window as any).fetchWeather = fetchWeather;
+;(window as any).speakText = speakText;
+;(window as any).pauseSpeech = pauseSpeech;
+;(window as any).resumeSpeech = resumeSpeech;
+;(window as any).stopSpeech = stopSpeech;
