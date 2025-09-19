@@ -30,7 +30,8 @@
       <button class="nav-btn" data-tab="buyer">Global Connect</button>
       <button class="nav-btn" data-tab="assistant">AI 비서</button>
       <button id="themeToggle" class="icon-btn" title="Light/Dark">🌓</button>
-      <button id="installPWA" class="pill-btn">앱 설치</button>
+     <!-- 설치 버튼 (헤더의 "앱 설치" 버튼과 연결할 id) -->
+      <button id="installBtn" style="display:none">앱 설치</button>
     </nav>
   </header>
 
@@ -159,5 +160,40 @@
     };
   </script>
   <script src="./assets/js/mirror.js"></script>
+  <script>
+  let deferredPrompt = null;
+  const installBtn = document.getElementById('installBtn');
+
+  // ① beforeinstallprompt 발생 시 저장하고 버튼 표시
+  window.addEventListener
+('beforeinstallprompt', (e) => {
+    e.preventDefault();            // 크롬 기본 배너 억제
+    deferredPrompt = e;            // 이벤트 보관
+    installBtn.style.display = 'inline-flex'; // 우리 버튼 노출
+  });
+
+  // ② 버튼 클릭 → 설치 프롬프트 강제 표시
+  installBtn.addEventListener
+('click', async () => {
+    if (!deferredPrompt) {
+      alert('설치 프롬프트가 아직 준비되지 않았습니다.');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice
+; // accepted / dismissed
+    // 한번 사용하면 이벤트는 무효화됨
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+    console.log('PWA install result:', outcome);
+  });
+
+  // ③ 설치 완료 감지(축하/안내 메시지 등)
+  window.addEventListener
+('appinstalled', () => {
+    console.log('PWA installed!');
+    installBtn.style.display = 'none';
+  });
+</script>
 </body>
 </html>
