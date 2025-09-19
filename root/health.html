@@ -15,3 +15,23 @@ document.getElementById('wx').onclick = async () => {
   out.textContent = await r.text();
 };
 </script>
+async function testAI() {
+  const r = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify({ prompt: '테스트: 한 문장으로 자기소개' })
+  });
+  console.log('AI', await r.json());
+}
+
+async function testWeather() {
+  // 날짜/시간 안 넘기면 서버가 자동 보정
+  const url = `/api/weather?nx=60&ny=127&type=JSON`;
+  const r = await fetch(url);
+  const j = await r.json();
+  console.log('WEATHER', j);
+  // 화면에 한 줄로라도 확인
+  document.body.insertAdjacentHTML('beforeend',
+    `<pre style="white-space:pre-wrap">${JSON.stringify(j).slice(0,1000)}...</pre>`);
+}
+</script>
