@@ -1,215 +1,35 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Health Check · AI & Weather</title>
-  <style>
-    :root { color-scheme: dark light; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, sans-serif; margin: 24px; }
-    h1 { font-size: 20px; margin: 0 0 16px; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .card {
-      border: 1px solid #ddd; border-radius: 12px; padding: 16px;
-      background: rgba(0,0,0,.03);
-    }
-    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .controls input, .controls select, .controls textarea {
-      font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; min-width: 120px;
-    }
-    .controls textarea { width: 100%; min-height: 90px; resize: vertical; }
-    button {
-      padding: 8px 14px; border-radius: 10px; border: 0; font-weight: 700; cursor: pointer;
-      background:#165dff; color:#fff;
-    }
-    button.secondary { background:#666; }
-    .out { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5;
-      border: 1px dashed #bbb; border-radius: 10px; padding: 12px; background: #fff; color:#111; overflow:auto; max-height: 380px; }
-    .ok { color: #0a7a26; font-weight: 700; }
-    .err { color: #d93025; font-weight: 700; }
-    small.hint { color:#666 }
-  </style>
+  <meta charset="UTF-8">
+  <title>Health Check</title>
 </head>
 <body>
-  <h1>헬스 체크 (AI / 기상청)</h1>
+  <button onclick="testAI()">AI 테스트</button>
+  <button onclick="testWeather()">날씨 테스트</button>
 
-  <div class="row">
-    <!-- AI -->
-    <div class="card">
-      <h2>① Gemini AI 테스트</h2>
-      <div class="controls">
-        <textarea id="aiPrompt" placeholder="예) 오늘 시장 일정 요약을 2줄로"></textarea>
-        <div style="display:flex; gap:8px;">
-          <button id="btnAsk">AI 테스트</button>
-          <button id="btnAiPing" class="secondary">AI 간단 핑</button>
-        </div>
-      </div>
-      <p class="ok" id="aiStatus">대기</p>
-      <div id="aiOut" class="out"></div>
-      <small class="hint">※ 400/401 오류가 나오면 GEMINI_API_KEY가 잘못되었거나 새 배포가 반영되지 않은 것입니다.</small>
-    </div>
-
-    <!-- Weather -->
-    <div class="card">
-      <h2>② 기상청 날씨 테스트</h2>
-      <div class="controls">
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <label>nx <input id="nx" type="number" value="60" /></label>
-          <label>ny <input id="ny" type="number" value="127" /></label>
-          <label>base_date <input id="baseDate" type="text" placeholder="YYYYMMDD (자동)" /></label>
-          <label>base_time <input id="baseTime" type="text" placeholder="HHmm (자동)" /></label>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button id="btnWx">날씨 테스트</button>
-          <button id="btnWxAuto" class="secondary">시간 자동 채우기</button>
-        </div>
-      </div>
-      <p class="ok" id="wxStatus">대기</p>
-      <div id="wxOut" class="out"></div>
-      <small class="hint">※ 400/403/500 오류면 WEATHER_API_KEY/시간대/좌표(nx,ny) 문제일 수 있습니다.</small>
-    </div>
-  </div>
+  <!-- 결과 출력 영역 -->
+  <pre id="output"></pre>
 
   <script>
-    // ---------- 공통 ----------
-    const pretty = (obj) => {
-      try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
-    };
-    const show = (el, text, ok=true) => {
-      el.className = ok ? "ok" : "err";
-      el.textContent = text;
-    };
-
-    // ---------- AI ----------
-    async function askGemini(prompt) {
+    async function testAI() {
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt: "안녕? 잘 작동하니?" })
       });
       const data = await res.json();
-      return data;
+      document.getElementById('output').textContent =
+        "AI 응답:\n" + JSON.stringify(data, null, 2);
     }
 
-    document.getElementById('btnAsk').onclick = async () => {
-      const prompt = document.getElementById('aiPrompt').value.trim() || '논산시 시장 비서 시나리오로 오늘 할 일을 3가지로 요약해줘';
-      const statusEl = document.getElementById('aiStatus');
-      const outEl = document.getElementById('aiOut');
-      show(statusEl, '요청 중…');
-      outEl.textContent = '';
-      try {
-        const data = await askGemini(prompt);
-        if (data.error) {
-          show(statusEl, `오류: ${data.error}`, false);
-          outEl.textContent = pretty(data.detail
- || data);
-        } else {
-          show(statusEl, '성공');
-          outEl.textContent = typeof data.text === 'string' ? data.text : pretty(data);
-        }
-      } catch (e) {
-        show(statusEl, '네트워크/서버 오류', false);
-        outEl.textContent = String(e);
-      }
-    };
-
-    // 간단 핑: 최소 요청/응답 확인
-    document.getElementById('btnAiPing').onclick = async () => {
-      const statusEl = document.getElementById('aiStatus');
-      const outEl = document.getElementById('aiOut');
-      show(statusEl, '핑 테스트 중…');
-      outEl.textContent = '';
-      try {
-        const data = await askGemini('한 문장으로 답해: 시스템 정상 동작 확인 메시지.');
-        if (data.error) {
-          show(statusEl, `오류: ${data.error}`, false);
-          outEl.textContent = pretty(data.detail
- || data);
-        } else {
-          show(statusEl, '성공');
-          outEl.textContent = typeof data.text === 'string' ? data.text : pretty(data);
-        }
-      } catch (e) {
-        show(statusEl, '네트워크/서버 오류', false);
-        outEl.textContent = String(e);
-      }
-    };
-
-    // ---------- Weather ----------
-    // 기상청 API는 3시간 단위(0200/0500/0800/…); 가장 가까운 이전 base_time을 자동 산출
-    function computeBaseDateTime(d = new Date()) {
-      const slots = [2,5,8,11,14,17,20,23]; // 시
-      let y = d.getFullYear();
-      let m = (d.getMonth()+1).toString().padStart(2,'0');
-      let dd = d.getDate().toString().padStart(2,'0');
-      let h = d.getHours();
-
-      let slot = Math.max(...slots.filter(s => s <= h));
-      if (slot === -Infinity || isNaN(slot)) {
-        // 새벽 0~1시는 전날 23시로
-        const ytd = new Date(d.getTime() - 24*60*60*1000);
-        y = ytd.getFullYear(); m = (ytd.getMonth()+1).toString().padStart(2,'0'); dd = ytd.getDate().toString().padStart(2,'0');
-        slot = 23;
-      }
-      const base_date = `${y}${m}${dd}`;
-      const base_time = `${String(slot).padStart(2,'0')}00`;
-      return { base_date, base_time };
-    }
-
-    async function fetchWeather(nx, ny, date, time) {
-      const url = `/api/weather?nx=${nx}&ny=${ny}&date=${date}&time=${time}&type=JSON`;
+    async function testWeather() {
+      const url = '/api/weather?nx=60&ny=127&date=20250919&time=0600&type=JSON';
       const res = await fetch(url);
-      return res.json();
+      const data = await res.json();
+      document.getElementById('output').textContent =
+        "날씨 응답:\n" + JSON.stringify(data, null, 2);
     }
-
-    // 버튼: 시간 자동 채우기
-    document.getElementById('btnWxAuto').onclick = () => {
-      const { base_date, base_time } = computeBaseDateTime(new Date());
-      document.getElementById('baseDate').value = base_date;
-      document.getElementById('baseTime').value = base_time;
-    };
-
-    // 버튼: 날씨 요청
-    document.getElementById('btnWx').onclick = async () => {
-      const statusEl = document.getElementById('wxStatus');
-      const outEl = document.getElementById('wxOut');
-      let nx = Number(document.getElementById('nx').value || 60);
-      let ny = Number(document.getElementById('ny').value || 127);
-      let date = document.getElementById('baseDate').value.trim();
-      let time = document.getElementById('baseTime').value.trim();
-
-      // 자동 보정
-      if (!date || !time) {
-        const dt = computeBaseDateTime(new Date());
-        date = dt.base_date; time = dt.base_time;
-        document.getElementById('baseDate').value = date;
-        document.getElementById('baseTime').value = time;
-      }
-
-      show(statusEl, `요청 중… (nx=${nx}, ny=${ny}, ${date} ${time})`);
-      outEl.textContent = '';
-      try {
-        const data = await fetchWeather(nx, ny, date, time);
-        if (data.error) {
-          show(statusEl, `오류: ${data.error}`, false);
-          outEl.textContent = pretty(data.detail
- || data);
-        } else {
-          show(statusEl, '성공');
-          outEl.textContent = pretty(data);
-        }
-      } catch (e) {
-        show(statusEl, '네트워크/서버 오류', false);
-        outEl.textContent = String(e);
-      }
-    };
-
-    // 페이지 진입 시 기본 시간 자동 세팅
-    (function init() {
-      const { base_date, base_time } = computeBaseDateTime(new Date());
-      document.getElementById('baseDate').placeholder = `${base_date} (자동 권장)`;
-      document.getElementById('baseTime').placeholder = `${base_time} (자동 권장)`;
-    })();
   </script>
 </body>
 </html>
