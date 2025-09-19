@@ -1,57 +1,114 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mayor Smart Mirror - AI Test</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Roboto, 'Noto Sans KR', sans-serif; background:#121212; color:#e7e7e7; padding:20px; }
-    .card{ background:#1e1e1e; padding:16px; border-radius:10px; max-width:900px; margin:10px auto; }
-    textarea{ width:100%; height:100px; background:#0f0f0f; color:#eee; border:1px solid #2b2b2b; padding:8px; border-radius:6px; }
-    button{ padding:8px 12px; border-radius:8px; border:none; cursor:pointer; background:#3b82f6; color:white; }
-    pre{ white-space:pre-wrap; background:#0b0b0b; padding:10px; border-radius:6px; color:#d6d6d6; }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>시장 집무실 스마트 미러 PRO</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+  <meta name="theme-color" content="#0b0f19" />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <div class="card">
-    <h2>AI 테스트 (Gemini)</h2>
-    <label>프롬프트:</label>
-    <textarea id="prompt">오늘 시장 일정 요약해줘</textarea>
-    <div style="margin-top:10px;">
-      <button id="send">AI 테스트</button>
-      <button id="clear">결과 초기화</button>
-    </div>
-    <h3>결과</h3>
-    <pre id="result">결과 대기중...</pre>
-  </div>
+  <header>
+    <h1>시장 집무실 스마트 미러 PRO</h1>
+    <time id="clock"></time>
+  </header>
 
+  <main>
+    <!-- 오늘 일정 -->
+    <section id="schedule">
+      <h2>오늘 일정</h2>
+      <div id="schedule-content">불러오는 중...</div>
+    </section>
+
+    <!-- 지역/날씨 -->
+    <section id="weather">
+      <h2>지역/날씨</h2>
+      <div id="weather-content">날씨 정보를 불러오는 중...</div>
+    </section>
+
+    <!-- 건강 상태 -->
+    <section id="health">
+      <h2>건강 (데모)</h2>
+      <ul>
+        <li>심박수: <span id="heart-rate">--</span></li>
+        <li>혈압: <span id="blood-pressure">--</span></li>
+        <li>걸음수: <span id="steps">--</span></li>
+        <li>수분: <span id="hydration">--</span></li>
+      </ul>
+    </section>
+
+    <!-- AI 비서 -->
+    <section id="ai-assistant">
+      <h2>AI 비서</h2>
+      <div id="chat-box">
+        <div id="chat-log"></div>
+        <input id="chat-input" type="text" placeholder="메모/날씨/긴급 지시 입력..." />
+        <button id="chat-send">보내기</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- JS -->
+  <script type="module" src="./ai.ts"></script>
   <script>
-    async function askGemini(prompt){
-      try{
-        const res = await fetch('/api/ai', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify({ prompt })
+    // 시계
+    function updateClock() {
+      const now = new Date();
+      document.getElementById("clock").textContent =
+        now.toLocaleTimeString("ko-KR") + " " +
+        now.toLocaleDateString("ko-KR");
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // AI 비서 이벤트
+    const chatInput = document.getElementById("chat-input");
+    const chatSend = document.getElementById("chat-send");
+    const chatLog = document.getElementById("chat-log");
+
+    async function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      chatLog.innerHTML += `<div><b>나:</b> ${text}</div>`;
+      chatInput.value = "";
+
+      try {
+        const res = await fetch("/api/ai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: text })
         });
-        const j = await res.json();
-        return j;
-      }catch(e){
-        return { error: String(e) };
+        const data = await res.json();
+        chatLog.innerHTML += `<div><b>AI:</b> ${data.text}</div>`;
+      } catch (err) {
+        chatLog.innerHTML += `<div style="color:red"><b>에러:</b> AI 응답 실패</div>`;
       }
     }
 
-    document.getElementById('send').addEventListener('click', async ()=>{
-      const prompt = document.getElementById('prompt').value.trim();
-      if(!prompt){ alert('프롬프트를 입력하세요'); return; }
-      document.getElementById('result').textContent = '요청중...';
-      const r = await askGemini(prompt);
-      // 보기 쉬운 형태로 출력
-      document.getElementById('result').textContent = JSON.stringify(r, null, 2);
+    chatSend.addEventListener("click", sendMessage);
+    chatInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") sendMessage();
     });
 
-    document.getElementById('clear').addEventListener('click', ()=> {
-      document.getElementById('result').textContent = '';
-    });
+    // 날씨 API (테스트 버튼)
+    async function fetchWeather(nx=60, ny=127, date="20250918", time="0600") {
+      try {
+        const res = await fetch(`/api/weather?nx=${nx}&ny=${ny}&date=${date}&time=${time}&type=JSON`);
+        const data = await res.json();
+        document.getElementById("weather-content").textContent =
+          JSON.stringify(data, null, 2);
+      } catch {
+        document.getElementById("weather-content").textContent = "날씨 불러오기 실패";
+      }
+    }
+    fetchWeather();
   </script>
 </body>
 </html>
