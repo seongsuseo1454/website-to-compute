@@ -1,175 +1,354 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>시장님 AI 비서</title>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>시장 집무실 스마트 미러 PRO</title>
+  <meta name="theme-color" content="#0b0f19" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon-192.png" />
   <style>
+    :root {
+      --bg: #0b0f19;
+      --card: rgba(255,255,255,0.08);
+      --border: rgba(255,255,255,0.14);
+      --text: #f5f7fb;
+      --muted: #a8b0c2;
+      --accent: #6ee7b7;
+    }
+    * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
-      background: #0b0f19;
-      color: #fff;
       margin: 0;
-      padding: 0;
-    }
-    header {
-      background: #111;
-      padding: 1rem;
-      text-align: center;
-    }
-    section {
-      padding: 2rem;
-    }
-    #chat-box {
-      height: 300px;
-      overflow-y: auto;
-      background: #111;
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-    }
-    #chat-controls {
+      background: radial-gradient(1200px 1200px at 80% -10%, #1a2340 0%, #0b0f19 55%);
+      color: var(--text);
+      font-family: "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, "맑은 고딕", sans-serif;
+      min-height: 100vh;
       display: flex;
-      gap: 0.5rem;
+      flex-direction: column;
+      gap: 16px;
+      padding: 24px clamp(16px, 4vw, 40px);
     }
-    #chat-input {
-      flex: 1;
-      padding: 0.5rem;
-      border-radius: 4px;
-      border: none;
+    header, main, footer {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
     }
-    button {
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
     }
-    #weather-result {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: #111;
-      border-radius: 8px;
+    @media (max-width: 950px) {
+      .row { grid-template-columns: 1fr; }
     }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .title { font-weight: 700; font-size: 1.2rem; margin-bottom: 6px; }
+    .muted { color: var(--muted); font-size: 0.95rem; }
+
+    /* 상단 배지/시간/날씨 */
+    .top {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+    }
+    @media (max-width: 950px) {
+      .top { grid-template-columns: 1fr; }
+    }
+    .clock {
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 12px;
+    }
+    .time { font-size: 2.6rem; font-weight: 800; letter-spacing: 1px; }
+    .date { color: var(--muted); }
+
+    .weather {
+      display: flex; gap: 12px; align-items: center; justify-content: space-between;
+    }
+    .weather-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .btn {
+      appearance: none; border:1px solid var(--border); background:transparent;
+      color: var(--text); padding: 8px 12px; border-radius: 10px; cursor:pointer;
+    }
+    .btn:hover { border-color: #7aa2ff; box-shadow: 0 0 0 3px rgba(122,162,255,0.18) inset; }
+
+    /* 채팅 */
+    .chat {
+      height: 480px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .messages {
+      flex:1; overflow: auto; border:1px solid var(--border); border-radius:12px; padding:12px;
+      background: rgba(0,0,0,0.15);
+    }
+    .msg { padding: 10px 12px; border-radius: 10px; margin-bottom: 10px; line-height: 1.5; }
+    .msg.user { background: rgba(110,231,183,0.12); border: 1px solid rgba(110,231,183,0.35); }
+    .msg.ai { background: rgba(122,162,255,0.12); border: 1px solid rgba(122,162,255,0.35); }
+    .chat-input {
+      display: grid; grid-template-columns: 1fr auto; gap: 8px;
+    }
+    input[type="text"], textarea {
+      width: 100%; background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border); color: var(--text);
+      padding: 10px 12px; border-radius: 10px; outline: none;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: #7aa2ff; }
+    .hint { font-size: 0.9rem; color: var(--muted); }
+
+    /* 음성 제어 */
+    .voice-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .switch { display:flex; align-items:center; gap:8px; }
+
+    /* 음성 인식 패널 */
+    .asr {
+      display: grid; grid-template-rows: auto 1fr auto; gap: 10px; height: 480px;
+    }
+    .asr-log {
+      border:1px solid var(--border); border-radius:12px; padding:12px;
+      background: rgba(0,0,0,0.15); overflow:auto;
+    }
+    .badge { padding:2px 8px; border-radius:999px; background:rgba(110,231,183,0.14); border:1px solid rgba(110,231,183,0.35); font-size: 0.85rem;}
   </style>
 </head>
 <body>
-  <header>
-    <h1>시장님 전용 AI 비서 시스템</h1>
+  <header class="top">
+    <div class="card">
+      <div class="title">시장님 안녕하세요</div>
+      <div class="clock">
+        <div>
+          <div class="time" id="now-time">--:--</div>
+          <div class="date" id="now-date">----.--.-- (---)</div>
+        </div>
+        <div class="badge">루미나 스마트 비서</div>
+      </div>
+    </div>
+
+    <div class="card weather">
+      <div>
+        <div class="title">현재 날씨</div>
+        <div class="muted">관측 좌표(nx, ny) 기준</div>
+        <div class="weather-grid muted" style="margin-top:8px;">
+          <div>온도: <span id="w-temp">-</span>°C</div>
+          <div>습도: <span id="w-hum">-</span>%</div>
+          <div>강수: <span id="w-pty">-</span></div>
+          <div>풍속: <span id="w-ws">-</span> m/s</div>
+        </div>
+      </div>
+      <div>
+        <button class="btn" id="btn-weather">날씨 업데이트</button>
+      </div>
+    </div>
   </header>
 
-  <!-- AI 대화 영역 -->
-  <section id="ai-assistant">
-    <h2>AI 비서 채팅</h2>
-    <div id="chat-box"></div>
-    <div id="chat-controls">
-      <input id="chat-input" type="text" placeholder="메시지를 입력하세요...">
-      <button id="send-btn">보내기</button>
-      <button id="voice-btn">🎤 음성</button>
-    </div>
-  </section>
+  <main class="row">
+    <!-- 채팅 -->
+    <section class="card chat">
+      <div class="title">AI 비서 채팅</div>
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <div class="chat-input">
+        <input id="chat-input" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" />
+        <button class="btn" id="btn-send">보내기</button>
+      </div>
+      <div class="voice-controls" style="margin-top:6px;">
+        <label class="switch">
+          <input type="checkbox" id="speak-toggle" checked />
+          <span class="muted">응답을 음성으로 읽기</span>
+        </label>
+        <button class="btn" onclick="pauseSpeech()">⏸️ 일시정지</button>
+        <button class="btn" onclick="resumeSpeech()">▶️ 재개</button>
+        <button class="btn" onclick="stopSpeech()">⏹️ 정지</button>
+      </div>
+      <div class="hint">* 특수문자/이모지는 자동 제거 후 낭독됩니다.</div>
+    </section>
 
-  <!-- 날씨 영역 -->
-  <section id="weather">
-    <h2>기상청 날씨 조회</h2>
-    <div>
-      <input id="date" type="text" placeholder="날짜 (예: 20250919)">
-      <input id="time" type="text" placeholder="시간 (예: 0600)">
-      <button id="weather-btn">날씨 조회</button>
+    <!-- 음성 명령 -->
+    <section class="card asr">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="title">음성 명령</div>
+        <div id="asr-status" class="badge">대기중</div>
+      </div>
+      <div id="asr-log" class="asr-log muted">마이크 버튼을 눌러 말씀해 주세요.</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn" id="btn-mic">🎤 음성 인식 시작</button>
+        <button class="btn" id="btn-mic-stop">■ 음성 인식 중지</button>
+      </div>
+      <div class="hint">* 브라우저의 마이크 권한을 허용해야 합니다. (Chrome 권장)</div>
+    </section>
+  </main>
+
+  <footer class="card">
+    <div class="muted">
+      ⓒ 논산시 시장 집무실 스마트 미러 PRO — 음성/채팅/날씨 연동 데모
     </div>
-    <div id="weather-result">👉 아직 조회 전입니다.</div>
-  </section>
+  </footer>
+
+  <!-- ai.ts(또는 ai.js) 로드 -->
+  <!-- TypeScript가 그대로 동작하지 않으면, 동일 내용을 /js/ai.js로 저장하고 아래 src를 /js/ai.js로 바꾸세요. -->
+  <script src="/js/ai.ts"></script>
 
   <script>
-  // ---------------- AI 비서 ----------------
-  async function askGemini(prompt) {
-    const res = await fetch('/api/ai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+    // ====== 시계 ======
+    const timeEl = document.getElementById('now-time');
+    const dateEl = document.getElementById('now-date');
+    const WEEK = ['일','월','화','수','목','금','토'];
+    function tick() {
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      timeEl.textContent = `${hh}:${mm}`;
+      dateEl.textContent = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} (${WEEK[d.getDay()]})`;
+    }
+    tick();
+    setInterval(tick, 1000 * 15);
+
+    // ====== 채팅 UI ======
+    const messagesEl = document.getElementById('messages');
+    const chatInput = document.getElementById('chat-input');
+    const btnSend = document.getElementById('btn-send');
+    const speakToggle = document.getElementById('speak-toggle');
+
+    function appendMsg(role, text) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    btnSend.addEventListener('click', async () => {
+      const prompt = chatInput.value.trim();
+      if (!prompt) return;
+      appendMsg('user', prompt);
+      chatInput.value = '';
+      appendMsg('ai', '생각 중…');
+
+      try {
+        const reply = await window.askGemini(prompt);
+        messagesEl.lastElementChild.textContent = reply || '응답 없음';
+        if (speakToggle.checked && reply) window.speakText(reply);
+      } catch (e) {
+        messagesEl.lastElementChild.textContent = '오류가 발생했습니다.';
+      }
     });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'AI error');
-    return data.text;
-  }
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) btnSend.click();
+    });
 
-  function appendMessage(sender, text) {
-    const box = document.getElementById('chat-box');
-    const msg = document.createElement('div');
-    msg.innerHTML = `<b>${sender}:</b> ${text}`;
-    msg.style.marginBottom = "0.5rem";
-    box.appendChild(msg);
-    box.scrollTop = box.scrollHeight;
-  }
+    // ====== 날씨 ======
+    const wTemp = document.getElementById('w-temp');
+    const wHum  = document.getElementById('w-hum');
+    const wPty  = document.getElementById('w-pty');
+    const wWs   = document.getElementById('w-ws');
+    const btnWeather = document.getElementById('btn-weather');
 
-  document.getElementById('send-btn').addEventListener('click', async () => {
-    const input = document.getElementById('chat-input');
-    const text = input.value.trim();
-    if (!text) return;
-    appendMessage('시장님', text);
-    input.value = '';
-    try {
-      const reply = await askGemini(text);
-      appendMessage('AI 비서', reply);
-      speak(reply);
-    } catch (err) {
-      appendMessage('시스템', '⚠️ 오류: ' + err.message);
+    function toDateTimeForKMA(d=new Date()) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      // 기상청 단기예보 base_time은 보통 정시단위(예: 0600)
+      const hh = String(d.getHours()).padStart(2,'0');
+      const baseTime = (hh + "00");
+      return { date: `${y}${m}${day}`, time: baseTime };
     }
-  });
 
-  document.getElementById('chat-input').addEventListener('keypress', e => {
-    if (e.key === 'Enter') document.getElementById('send-btn').click();
-  });
+    async function loadWeather() {
+      // ★ 논산시 주변 격자 좌표 예시 — 필요 시 실제 nx,ny로 교체
+      const nx = 63, ny = 98;
+      const { date, time } = toDateTimeForKMA();
 
-  // 음성 인식
-  let recognition;
-  if ('webkitSpeechRecognition' in window) {
-    recognition = new webkitSpeechRecognition();
-    recognition.lang = 'ko-KR';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = e => {
-      const text = e.results[0][0].transcript;
-      document.getElementById('chat-input').value = text;
-      document.getElementById('send-btn').click();
-    };
-  }
-
-  document.getElementById('voice-btn').addEventListener('click', () => {
-    if (!recognition) {
-      alert('이 브라우저는 음성인식을 지원하지 않습니다.');
-      return;
+      const data = await window.fetchWeather(nx, ny, date, time);
+      if (data?.error) {
+        wTemp.textContent = '-'; wHum.textContent = '-'; wPty.textContent='-'; wWs.textContent='-';
+        return;
+      }
+      // API 라우터에서 표준화했다고 가정: { temp, humidity, ptyText, wind }
+      // 혹은 원본 KMA 응답이라면, 라우터에서 파싱해주고 오세요.
+      try {
+        wTemp.textContent = data.temp ?? '-';
+        wHum.textContent  = data.humidity ?? '-';
+        wPty.textContent  = data.ptyText ?? '-';
+        wWs.textContent   = data.wind ?? '-';
+      } catch {
+        wTemp.textContent = '-'; wHum.textContent = '-'; wPty.textContent='-'; wWs.textContent='-';
+      }
     }
-    recognition.start();
-  });
+    btnWeather.addEventListener('click', loadWeather);
+    loadWeather();
 
-  // 음성 출력
-  function speak(text) {
-    if (!window.speechSynthesis) return;
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'ko-KR';
-    utter.rate = 1.0;
-    speechSynthesis.speak(utter);
-  }
+    // ====== 음성 인식 (Web Speech API) ======
+    const asrStatus = document.getElementById('asr-status');
+    const asrLog = document.getElementById('asr-log');
+    const btnMic = document.getElementById('btn-mic');
+    const btnMicStop = document.getElementById('btn-mic-stop');
 
-  // ---------------- 날씨 조회 ----------------
-  async function fetchWeather(nx, ny, date, time) {
-    const url = `/api/weather?nx=${nx}&ny=${ny}&date=${date}&time=${time}&type=JSON`;
-    const res = await fetch(url);
-    return res.json();
-  }
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let rec = null;
 
-  document.getElementById('weather-btn').addEventListener('click', async () => {
-    const date = document.getElementById('date').value.trim();
-    const time = document.getElementById('time').value.trim();
-    try {
-      const data = await fetchWeather(60, 127, date, time);
-      document.getElementById('weather-result').innerText =
-        JSON.stringify(data, null, 2);
-    } catch (err) {
-      document.getElementById('weather-result').innerText =
-        '⚠️ 오류: ' + err.message;
+    function setASR(on) {
+      asrStatus.textContent = on ? '듣는 중' : '대기중';
+      asrStatus.style.background = on ? 'rgba(122,162,255,0.18)' : 'rgba(110,231,183,0.14)';
+      asrStatus.style.border = on ? '1px solid rgba(122,162,255,0.45)' : '1px solid rgba(110,231,183,0.35)';
     }
-  });
+
+    if (SpeechRec) {
+      rec = new SpeechRec();
+      rec.lang = 'ko-KR';
+      rec.interimResults = true;
+      rec.continuous = true;
+
+      rec.onstart = () => { setASR(true); };
+      rec.onend = () => { setASR(false); };
+      rec.onerror = (e) => {
+        setASR(false);
+        asrLog.textContent = '음성 인식 오류: ' + (e.error || 'unknown');
+      };
+      rec.onresult = async (e) => {
+        let finalText = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) finalText += t;
+        }
+        if (finalText) {
+          // 채팅처럼 처리: 화면에 추가 + AI 호출 + 낭독
+          appendMsg('user', finalText);
+          appendMsg('ai', '생각 중…');
+          try {
+            const reply = await window.askGemini(finalText);
+            messagesEl.lastElementChild.textContent = reply || '응답 없음';
+            if (speakToggle.checked && reply) window.speakText(reply);
+          } catch (e) {
+            messagesEl.lastElementChild.textContent = '오류가 발생했습니다.';
+          }
+          asrLog.textContent = '마지막 인식: ' + finalText;
+        }
+      };
+
+      btnMic.addEventListener('click', () => {
+        try { rec.start(); } catch {}
+      });
+      btnMicStop.addEventListener('click', () => {
+        try { rec.stop(); } catch {}
+      });
+    } else {
+      asrLog.textContent = '이 브라우저는 음성 인식을 지원하지 않습니다. (Chrome 사용 권장)';
+      btnMic.disabled = true;
+      btnMicStop.disabled = true;
+    }
+
+    // 음성 제어 버튼이 index.html에서 window.* 호출
+    window.pauseSpeech = window.pauseSpeech;
+    window.resumeSpeech = window.resumeSpeech;
+    window.stopSpeech   = window.stopSpeech;
   </script>
 </body>
 </html>
