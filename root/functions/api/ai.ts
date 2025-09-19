@@ -1,77 +1,186 @@
 // functions/api/ai.ts
-// Cloudflare Pages Functions (Node-style) — Gemini 2.0 Flash / 2.5 Flash 호출 프록시
-// 필요 환경변수: GEMINI_API_KEY
-export const onRequestPost: PagesFunction = async (ctx) => {
+// Cloudflare Pages Functions (TypeScript)
+// Google Gemini 프록시: 텍스트 입력 → 텍스트/툴스트립 응답
+// - CORS 허용
+// - 표준 에러 포맷
+// - 모델/시스템프롬프트/온도/토큰/JSON 출력 모드 지원
+
+type Ctx = {
+  request: Request;
+  env: { GEMINI_API_KEY?: string };
+};
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+const j = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data, null, 2), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8", ...CORS },
+  });
+
+const bad = (msg: string, status = 400, extra?: Record<string, any>) => j({ ok: false, error: msg, ...extra }, status);
+
+export const onRequestOptions: PagesFunction = async () =>
+  new Response(null, { status: 204, headers: CORS });
+
+export const onRequestGet: PagesFunction = async (ctx: Ctx) => handle(ctx);
+export const onRequestPost: PagesFunction = async (ctx: Ctx) => handle(ctx);
+
+async function handle({ request, env }: Ctx): Promise<Response> {
   try {
-    const { request, env } = ctx;
-    const apiKey = env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not set" }), {
-        status: 500,
-        headers: { "content-type": "application/json; charset=utf-8" },
+    const key = env.GEMINI_API_KEY;
+    if (!key) return bad("Missing env.GEMINI_API_KEY. Cloudflare Pages 환경변수에 등록하세요.", 500);
+
+    // ---- 입력 수집 (GET 쿼리 또는 POST JSON) ----
+    const url = new URL(request.url);
+    const isPost = request.method === "POST";
+    const body = isPost ? await safeJson(request) : {};
+    const qp = url.searchParams;
+
+    const model =
+      (qp.get("model") || (body as any)?.model || "gemini-2.0-flash") as string;
+
+    const prompt =
+      (qp.get("prompt") || (body as any)?.prompt || "").toString();
+
+    const system =
+      (qp.get("system") || (body as any)?.system || "").toString();
+
+    const temperature = asNum(qp.get("temperature"), (body as any)?.temperature, 0.7);
+    const maxTokens = asInt(qp.get("maxTokens"), (body as any)?.maxTokens, 1024);
+    const jsonMode = asBool(qp.get("json"), (body as any)?.json, false);
+
+    if (!prompt) return bad("prompt is required");
+
+    // ---- Gemini REST 요청 페이로드 구성 ----
+    // Google AI Studio REST:
+    // POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      model
+    )}:generateContent?key=${encodeURIComponent(key)}`;
+
+    // system 프롬프트는 "system_instruction" 또는 첫 메시지에 주입
+    const contents: any[] = [];
+    if (system) {
+      contents.push({
+        role: "user",
+        parts: [{ text: `SYSTEM:\n${system}` }],
       });
     }
-
-    const { prompt } = await request.json();
-    if (!prompt || typeof prompt !== "string") {
-      return new Response(JSON.stringify({ error: "prompt is required" }), {
-        status: 400,
-        headers: { "content-type": "application/json; charset=utf-8" },
-      });
-    }
-
-    // Gemini 2.0/2.5 Flash text endpoint (non-stream)
-    const model = "gemini-2.0-flash"; // 필요시 "gemini-2.5-flash"로 교체 가능
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-        safetySettings: [
-          // 보수적 기본값
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.9,
-          topK: 40,
-          maxOutputTokens: 1024,
-        },
-      }),
+    contents.push({
+      role: "user",
+      parts: [{ text: prompt }],
     });
+
+    const genConfig: Record<string, any> = {
+      temperature,
+      maxOutputTokens: maxTokens,
+    };
+    if (jsonMode) {
+      genConfig.responseMimeType = "application/json";
+    }
+
+    const payload = {
+      contents,
+      generationConfig: genConfig,
+    };
+
+    // ---- 호출 ----
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text(); // 우선 문자열로
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      // JSON 파싱 실패 시 원문 그대로 반환
+      return j(
+        {
+          ok: false,
+          error: "Gemini response is not JSON",
+          status: res.status,
+          model,
+          request: { promptSample: prompt.slice(0, 140), temperature, maxTokens, jsonMode },
+          raw: text.slice(0, 2000),
+        },
+        res.ok ? 200 : 502
+      );
+    }
 
     if (!res.ok) {
-      const t = await res.text();
-      return new Response(JSON.stringify({ error: "Gemini call failed", detail: t }), {
-        status: 500,
-        headers: { "content-type": "application/json; charset=utf-8" },
-      });
+      return j(
+        {
+          ok: false,
+          error: "Gemini HTTP error",
+          status: res.status,
+          model,
+          request: { temperature, maxTokens, jsonMode },
+          response: parsed,
+        },
+        502
+      );
     }
 
-    const data = await res.json();
-    const text =
-      data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("\n").trim() ||
-      data?.candidates?.[0]?.output_text ||
-      "(응답이 비어있습니다)";
+    // ---- 텍스트 추출 (일반 텍스트 모드) ----
+    // v1beta 응답: candidates[0].content.parts[].text
+    let combinedText = "";
+    try {
+      const cand = parsed.candidates?.[0];
+      const parts = cand?.content?.parts || [];
+      combinedText = parts.map((p: any) => p.text || "").join("");
+    } catch {
+      /* noop */
+    }
 
-    return new Response(JSON.stringify({ text }), {
-      status: 200,
-      headers: { "content-type": "application/json; charset=utf-8" },
+    return j({
+      ok: true,
+      model,
+      used: { temperature, maxTokens, jsonMode },
+      text: combinedText || null,
+      response: parsed, // 원문도 함께 (디버깅/고급용)
     });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message || "unknown error" }), {
-      status: 500,
-      headers: { "content-type": "application/json; charset=utf-8" },
-    });
+    return bad(`Unhandled error: ${e?.message || String(e)}`, 500);
   }
-};
+}
+
+async function safeJson(req: Request) {
+  try {
+    return await req.json();
+  } catch {
+    return {};
+  }
+}
+function asNum(...vals: any[]) {
+  for (const v of vals) {
+    if (v === undefined || v === null || v === "") continue;
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n;
+  }
+  return undefined;
+}
+function asInt(...vals: any[]) {
+  const n = asNum(...vals);
+  return typeof n === "number" ? Math.floor(n) : undefined;
+}
+function asBool(...vals: any[]) {
+  for (const v of vals) {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "string") {
+      const s = v.toLowerCase();
+      if (["1", "true", "yes", "y"].includes(s)) return true;
+      if (["0", "false", "no", "n"].includes(s)) return false;
+    }
+  }
+  return false;
+        }
 
    
