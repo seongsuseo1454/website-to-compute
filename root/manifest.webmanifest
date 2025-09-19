@@ -1,7 +1,7 @@
 {
   "name": "시장 집무실 스마트 미러 PRO",
   "short_name": "Mayor Mirror",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b0f19",
   "theme_color": "#0b0f19",
