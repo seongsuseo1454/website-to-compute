@@ -1,189 +1,175 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>스마트미러 · AI 비서 테스트</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>시장님 AI 비서</title>
   <style>
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif;background:#0b0f19;color:#fff}
-    .wrap{max-width:920px;margin:0 auto;padding:24px}
-    h1{font-size:20px;margin:0 0 16px}
-    .card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:16px;margin-bottom:16px}
-    .row{display:flex;gap:8px}
-    input,button,textarea{border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff}
-    input,textarea{flex:1;padding:12px}
-    button{padding:12px 16px;cursor:pointer}
-    .ok{border-color:#37d67a;background:rgba(55,214,122,.12)}
-    .err{border-color:#ff6b6b;background:rgba(255,107,107,.12);white-space:pre-wrap}
-    .muted{opacity:.8;font-size:14px}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;white-space:pre-wrap}
-    .spinner{display:none}
-    .spinner.show{display:inline-block}
+    body {
+      font-family: Arial, sans-serif;
+      background: #0b0f19;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #111;
+      padding: 1rem;
+      text-align: center;
+    }
+    section {
+      padding: 2rem;
+    }
+    #chat-box {
+      height: 300px;
+      overflow-y: auto;
+      background: #111;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+    #chat-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+    #chat-input {
+      flex: 1;
+      padding: 0.5rem;
+      border-radius: 4px;
+      border: none;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #weather-result {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #111;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>AI 비서 연결 점검</h1>
+  <header>
+    <h1>시장님 전용 AI 비서 시스템</h1>
+  </header>
 
-    <div class="card">
-      <div class="muted">1) 아래 입력 → <b>/api/ai</b> 호출 → 응답을 그대로 표시합니다.</div>
-      <div class="row" style="margin-top:10px">
-        <input id="q" placeholder="예) 오늘 일정 요약해줘" />
-        <button id="go">질의</button>
-      </div>
-      <div style="margin-top:10px">
-        <span id="spin" class="spinner">⏳ 요청 중…</span>
-      </div>
+  <!-- AI 대화 영역 -->
+  <section id="ai-assistant">
+    <h2>AI 비서 채팅</h2>
+    <div id="chat-box"></div>
+    <div id="chat-controls">
+      <input id="chat-input" type="text" placeholder="메시지를 입력하세요...">
+      <button id="send-btn">보내기</button>
+      <button id="voice-btn">🎤 음성</button>
     </div>
+  </section>
 
-    <div id="outOK" class="card ok" style="display:none">
-      <div><b>응답</b></div>
-      <div id="okText" class="mono"></div>
+  <!-- 날씨 영역 -->
+  <section id="weather">
+    <h2>기상청 날씨 조회</h2>
+    <div>
+      <input id="date" type="text" placeholder="날짜 (예: 20250919)">
+      <input id="time" type="text" placeholder="시간 (예: 0600)">
+      <button id="weather-btn">날씨 조회</button>
     </div>
-
-    <div id="outERR" class="card err" style="display:none">
-      <div><b>에러</b> (네트워크/서버/키 문제 등)</div>
-      <div id="errText" class="mono"></div>
-    </div>
-
-    <div class="card">
-      <div class="muted">
-        환경변수 점검: Cloudflare Pages → Settings → <b>Environment variables</b> →<br>
-        <b>GEMINI_API_KEY</b> 존재/맞춤? → 저장 후 <b>Deployments → Retry deployment</b>로 재배포.
-      </div>
-    </div>
-  </div>
+    <div id="weather-result">👉 아직 조회 전입니다.</div>
+  </section>
 
   <script>
-    const $ = (id)=>document.getElementById(id);
-    const spin = $('spin'), outOK = $('outOK'), okText = $('okText'), outERR = $('outERR'), errText = $('errText');
-
-    $('go').addEventListener('click', async ()=>{
-      const prompt = $('q').value.trim();
-      outOK.style.display='none';
-      outERR.style.display='none';
-      spin.classList.add('show');
-      try{
-        const r = await fetch('/api/ai', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ prompt })
-        });
-
-        const raw = await r.text();
-        let data = null;
-        try{ data = JSON.parse(raw) }catch{}
-
-        if(!r.ok){
-          outERR.style.display='block';
-          errText.textContent = JSON.stringify({
-            status:r.status,
-            statusText:r.statusText,
-            body: data ?? raw
-          }, null, 2);
-          return;
-        }
-
-        const text = data?.text ?? raw;
-        outOK.style.display='block';
-        okText.textContent = text;
-      }catch(e){
-        outERR.style.display='block';
-        errText.textContent = 'Fetch failed: ' + String(e);
-      }finally{
-        spin.classList.remove('show');
-      }
+  // ---------------- AI 비서 ----------------
+  async function askGemini(prompt) {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
     });
-  </script>
-  <!-- ===================== AI 비서 대화 영역 ===================== -->
-<section id="ai-assistant" style="padding:2rem; background:#0b0f19; color:#fff; min-height:100vh;">
-  <h2>시장님 AI 비서</h2>
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'AI error');
+    return data.text;
+  }
 
-  <!-- 채팅 입력/출력 -->
-  <div id="chat-box" style="height:300px; overflow-y:auto; background:#111; padding:1rem; border-radius:8px; margin-bottom:1rem;"></div>
+  function appendMessage(sender, text) {
+    const box = document.getElementById('chat-box');
+    const msg = document.createElement('div');
+    msg.innerHTML = `<b>${sender}:</b> ${text}`;
+    msg.style.marginBottom = "0.5rem";
+    box.appendChild(msg);
+    box.scrollTop = box.scrollHeight;
+  }
 
-  <div style="display:flex; gap:0.5rem;">
-    <input id="chat-input" type="text" placeholder="메시지를 입력하세요..."
-      style="flex:1; padding:0.5rem; border-radius:4px; border:none;">
-    <button id="send-btn">보내기</button>
-    <button id="voice-btn">🎤 음성</button>
-  </div>
-</section>
-
-<script>
-async function askGemini(prompt) {
-  const res = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt })
+  document.getElementById('send-btn').addEventListener('click', async () => {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    appendMessage('시장님', text);
+    input.value = '';
+    try {
+      const reply = await askGemini(text);
+      appendMessage('AI 비서', reply);
+      speak(reply);
+    } catch (err) {
+      appendMessage('시스템', '⚠️ 오류: ' + err.message);
+    }
   });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'AI error');
-  return data.text;
-}
 
-// 채팅 박스 업데이트
-function appendMessage(sender, text) {
-  const box = document.getElementById('chat-box');
-  const msg = document.createElement('div');
-  msg.innerHTML = `<b>${sender}:</b> ${text}`;
-  msg.style.marginBottom = "0.5rem";
-  box.appendChild(msg);
-  box.scrollTop = box.scrollHeight;
-}
+  document.getElementById('chat-input').addEventListener('keypress', e => {
+    if (e.key === 'Enter') document.getElementById('send-btn').click();
+  });
 
-// 보내기 버튼
-document.getElementById('send-btn').addEventListener('click', async () => {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-  appendMessage('시장님', text);
-  input.value = '';
-  try {
-    const reply = await askGemini(text);
-    appendMessage('AI 비서', reply);
-    speak(reply);
-  } catch (err) {
-    appendMessage('시스템', '⚠️ 오류: ' + err.message);
+  // 음성 인식
+  let recognition;
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = e => {
+      const text = e.results[0][0].transcript;
+      document.getElementById('chat-input').value = text;
+      document.getElementById('send-btn').click();
+    };
   }
-});
 
-// 엔터키도 전송
-document.getElementById('chat-input').addEventListener('keypress', e => {
-  if (e.key === 'Enter') document.getElementById('send-btn').click();
-});
+  document.getElementById('voice-btn').addEventListener('click', () => {
+    if (!recognition) {
+      alert('이 브라우저는 음성인식을 지원하지 않습니다.');
+      return;
+    }
+    recognition.start();
+  });
 
-// 음성인식 (Web Speech API, 크롬/엣지 지원)
-let recognition;
-if ('webkitSpeechRecognition' in window) {
-  recognition = new webkitSpeechRecognition();
-  recognition.lang = 'ko-KR';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-  recognition.onresult = e => {
-    const text = e.results[0][0].transcript;
-    document.getElementById('chat-input').value = text;
-    document.getElementById('send-btn').click();
-  };
-}
-
-document.getElementById('voice-btn').addEventListener('click', () => {
-  if (!recognition) {
-    alert('이 브라우저는 음성인식을 지원하지 않습니다.');
-    return;
+  // 음성 출력
+  function speak(text) {
+    if (!window.speechSynthesis) return;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'ko-KR';
+    utter.rate = 1.0;
+    speechSynthesis.speak(utter);
   }
-  recognition.start();
-});
 
-// 음성 출력 (TTS)
-function speak(text) {
-  if (!window.speechSynthesis) return;
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = 'ko-KR';
-  utter.rate = 1.0;
-  speechSynthesis.speak(utter);
-}
-</script>
-<!-- =========================================================== -->
+  // ---------------- 날씨 조회 ----------------
+  async function fetchWeather(nx, ny, date, time) {
+    const url = `/api/weather?nx=${nx}&ny=${ny}&date=${date}&time=${time}&type=JSON`;
+    const res = await fetch(url);
+    return res.json();
+  }
+
+  document.getElementById('weather-btn').addEventListener('click', async () => {
+    const date = document.getElementById('date').value.trim();
+    const time = document.getElementById('time').value.trim();
+    try {
+      const data = await fetchWeather(60, 127, date, time);
+      document.getElementById('weather-result').innerText =
+        JSON.stringify(data, null, 2);
+    } catch (err) {
+      document.getElementById('weather-result').innerText =
+        '⚠️ 오류: ' + err.message;
+    }
+  });
+  </script>
 </body>
 </html>
