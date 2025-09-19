@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Health Check</title>
+<button id="ai">AI 테스트</button>
+<button id="wx">날씨 테스트</button>
+<pre id="out"></pre>
+<script>
+const out = document.getElementById('out');
+document.getElementById('ai').onclick = async () => {
+  const r = await fetch('/api/ai', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({prompt:'상태 점검 한 줄'})});
+  out.textContent = await r.text();
+};
+document.getElementById('wx').onclick = async () => {
+  const r = await fetch('/api/weather?nx=60&ny=127&date=20250919&time=0600&type=JSON');
+  out.textContent = await r.text();
+};
+</script>
