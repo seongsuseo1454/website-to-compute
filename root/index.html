@@ -1,114 +1,99 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>시장 집무실 스마트 미러 PRO</title>
-
-  <!-- PWA -->
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
-  <meta name="theme-color" content="#0b0f19" />
-
-  <!-- CSS -->
-  <link rel="stylesheet" href="./style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>스마트미러 · AI 비서 테스트</title>
+  <style>
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif;background:#0b0f19;color:#fff}
+    .wrap{max-width:920px;margin:0 auto;padding:24px}
+    h1{font-size:20px;margin:0 0 16px}
+    .card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:16px;margin-bottom:16px}
+    .row{display:flex;gap:8px}
+    input,button,textarea{border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff}
+    input,textarea{flex:1;padding:12px}
+    button{padding:12px 16px;cursor:pointer}
+    .ok{border-color:#37d67a;background:rgba(55,214,122,.12)}
+    .err{border-color:#ff6b6b;background:rgba(255,107,107,.12);white-space:pre-wrap}
+    .muted{opacity:.8;font-size:14px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;white-space:pre-wrap}
+    .spinner{display:none}
+    .spinner.show{display:inline-block}
+  </style>
 </head>
 <body>
-  <header>
-    <h1>시장 집무실 스마트 미러 PRO</h1>
-    <time id="clock"></time>
-  </header>
+  <div class="wrap">
+    <h1>AI 비서 연결 점검</h1>
 
-  <main>
-    <!-- 오늘 일정 -->
-    <section id="schedule">
-      <h2>오늘 일정</h2>
-      <div id="schedule-content">불러오는 중...</div>
-    </section>
-
-    <!-- 지역/날씨 -->
-    <section id="weather">
-      <h2>지역/날씨</h2>
-      <div id="weather-content">날씨 정보를 불러오는 중...</div>
-    </section>
-
-    <!-- 건강 상태 -->
-    <section id="health">
-      <h2>건강 (데모)</h2>
-      <ul>
-        <li>심박수: <span id="heart-rate">--</span></li>
-        <li>혈압: <span id="blood-pressure">--</span></li>
-        <li>걸음수: <span id="steps">--</span></li>
-        <li>수분: <span id="hydration">--</span></li>
-      </ul>
-    </section>
-
-    <!-- AI 비서 -->
-    <section id="ai-assistant">
-      <h2>AI 비서</h2>
-      <div id="chat-box">
-        <div id="chat-log"></div>
-        <input id="chat-input" type="text" placeholder="메모/날씨/긴급 지시 입력..." />
-        <button id="chat-send">보내기</button>
+    <div class="card">
+      <div class="muted">1) 아래 입력 → <b>/api/ai</b> 호출 → 응답을 그대로 표시합니다.</div>
+      <div class="row" style="margin-top:10px">
+        <input id="q" placeholder="예) 오늘 일정 요약해줘" />
+        <button id="go">질의</button>
       </div>
-    </section>
-  </main>
+      <div style="margin-top:10px">
+        <span id="spin" class="spinner">⏳ 요청 중…</span>
+      </div>
+    </div>
 
-  <!-- JS -->
-  <script type="module" src="./ai.ts"></script>
+    <div id="outOK" class="card ok" style="display:none">
+      <div><b>응답</b></div>
+      <div id="okText" class="mono"></div>
+    </div>
+
+    <div id="outERR" class="card err" style="display:none">
+      <div><b>에러</b> (네트워크/서버/키 문제 등)</div>
+      <div id="errText" class="mono"></div>
+    </div>
+
+    <div class="card">
+      <div class="muted">
+        환경변수 점검: Cloudflare Pages → Settings → <b>Environment variables</b> →<br>
+        <b>GEMINI_API_KEY</b> 존재/맞춤? → 저장 후 <b>Deployments → Retry deployment</b>로 재배포.
+      </div>
+    </div>
+  </div>
+
   <script>
-    // 시계
-    function updateClock() {
-      const now = new Date();
-      document.getElementById("clock").textContent =
-        now.toLocaleTimeString("ko-KR") + " " +
-        now.toLocaleDateString("ko-KR");
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
+    const $ = (id)=>document.getElementById(id);
+    const spin = $('spin'), outOK = $('outOK'), okText = $('okText'), outERR = $('outERR'), errText = $('errText');
 
-    // AI 비서 이벤트
-    const chatInput = document.getElementById("chat-input");
-    const chatSend = document.getElementById("chat-send");
-    const chatLog = document.getElementById("chat-log");
-
-    async function sendMessage() {
-      const text = chatInput.value.trim();
-      if (!text) return;
-      chatLog.innerHTML += `<div><b>나:</b> ${text}</div>`;
-      chatInput.value = "";
-
-      try {
-        const res = await fetch("/api/ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: text })
+    $('go').addEventListener('click', async ()=>{
+      const prompt = $('q').value.trim();
+      outOK.style.display='none';
+      outERR.style.display='none';
+      spin.classList.add('show');
+      try{
+        const r = await fetch('/api/ai', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ prompt })
         });
-        const data = await res.json();
-        chatLog.innerHTML += `<div><b>AI:</b> ${data.text}</div>`;
-      } catch (err) {
-        chatLog.innerHTML += `<div style="color:red"><b>에러:</b> AI 응답 실패</div>`;
-      }
-    }
 
-    chatSend.addEventListener("click", sendMessage);
-    chatInput.addEventListener("keydown", e => {
-      if (e.key === "Enter") sendMessage();
+        const raw = await r.text();
+        let data = null;
+        try{ data = JSON.parse(raw) }catch{}
+
+        if(!r.ok){
+          outERR.style.display='block';
+          errText.textContent = JSON.stringify({
+            status:r.status,
+            statusText:r.statusText,
+            body: data ?? raw
+          }, null, 2);
+          return;
+        }
+
+        const text = data?.text ?? raw;
+        outOK.style.display='block';
+        okText.textContent = text;
+      }catch(e){
+        outERR.style.display='block';
+        errText.textContent = 'Fetch failed: ' + String(e);
+      }finally{
+        spin.classList.remove('show');
+      }
     });
-
-    // 날씨 API (테스트 버튼)
-    async function fetchWeather(nx=60, ny=127, date="20250918", time="0600") {
-      try {
-        const res = await fetch(`/api/weather?nx=${nx}&ny=${ny}&date=${date}&time=${time}&type=JSON`);
-        const data = await res.json();
-        document.getElementById("weather-content").textContent =
-          JSON.stringify(data, null, 2);
-      } catch {
-        document.getElementById("weather-content").textContent = "날씨 불러오기 실패";
-      }
-    }
-    fetchWeather();
   </script>
 </body>
 </html>
