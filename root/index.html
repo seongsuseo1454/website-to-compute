@@ -1,199 +1,57 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>시장 집무실 스마트미러 · PRO (정적 단일본)</title>
-
-  <!-- PWA -->
-  <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
-  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
-  <link rel="apple-touch-icon" href="./icon-192.png">
-  <meta name="theme-color" content="#0b0f19">
-  
-  <!-- Styles -->
-  <link rel="stylesheet" href="./assets/css/reset.css">
-  <link rel="stylesheet" href="./style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mayor Smart Mirror - AI Test</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Roboto, 'Noto Sans KR', sans-serif; background:#121212; color:#e7e7e7; padding:20px; }
+    .card{ background:#1e1e1e; padding:16px; border-radius:10px; max-width:900px; margin:10px auto; }
+    textarea{ width:100%; height:100px; background:#0f0f0f; color:#eee; border:1px solid #2b2b2b; padding:8px; border-radius:6px; }
+    button{ padding:8px 12px; border-radius:8px; border:none; cursor:pointer; background:#3b82f6; color:white; }
+    pre{ white-space:pre-wrap; background:#0b0b0b; padding:10px; border-radius:6px; color:#d6d6d6; }
+  </style>
 </head>
-<body class="theme-dark">
-  <!-- 상단 고급 네비게이션 -->
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo-dot"></span>
-      <strong>Mayor Smart Mirror</strong>
-      <em>PRO · Static</em>
+<body>
+  <div class="card">
+    <h2>AI 테스트 (Gemini)</h2>
+    <label>프롬프트:</label>
+    <textarea id="prompt">오늘 시장 일정 요약해줘</textarea>
+    <div style="margin-top:10px;">
+      <button id="send">AI 테스트</button>
+      <button id="clear">결과 초기화</button>
     </div>
-    <nav class="menu">
-      <button class="nav-btn" data-tab="dashboard">대시보드</button>
-      <button class="nav-btn" data-tab="org">조직/업무</button>
-      <button class="nav-btn" data-tab="buyer">Global Connect</button>
-      <button class="nav-btn" data-tab="assistant">AI 비서</button>
-      <button id="themeToggle" class="icon-btn" title="Light/Dark">🌓</button>
-     <!-- 설치 버튼 (헤더의 "앱 설치" 버튼과 연결할 id) -->
-      <button id="installBtn" style="display:none">앱 설치</button>
-    </nav>
-  </header>
-
-  <!-- 본문 -->
-  <main class="container">
-
-    <!-- DASHBOARD -->
-    <section id="tab-dashboard" class="tab active">
-      <div class="hero">
-        <h1 id="title">시장 집무실 스마트 미러 PRO</h1>
-        <div class="time">
-          <div id="clock">--:--</div>
-          <div id="date">----.--.-- (-)</div>
-        </div>
-      </div>
-
-      <div class="grid">
-        <div class="card">
-          <div class="card-hd">오늘 일정</div>
-          <div class="kpis">
-            <div class="kpi"><span>회의</span><strong id="kpi-meetings">2</strong></div>
-            <div class="kpi"><span>할 일</span><strong id="kpi-todos">3</strong></div>
-            <div class="kpi"><span>민원</span><strong id="kpi-incidents">0</strong></div>
-            <div class="kpi"><span>수면</span><strong id="kpi-sleep">--</strong></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-hd">지역/날씨 (데모)</div>
-          <div class="rows" id="regionBox">
-            <div class="row">상태: <b>맑음</b></div>
-            <div class="row">기온: <b>26℃</b></div>
-            <div class="row">PM2.5: <b>18</b></div>
-            <div class="row">PM10: <b>42</b></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-hd">건강 (데모)</div>
-          <div class="rows" id="healthBox">
-            <div class="row">심박수: <b>76 bpm</b></div>
-            <div class="row">혈압: <b>122/79</b></div>
-            <div class="row">걸음수: <b>7,340 보</b></div>
-            <div class="row">수분: <b>62%</b></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-hd">빠른 동작</div>
-          <div class="actions">
-            <button class="act-btn" data-action="emergency">🚨 긴급 알림</button>
-            <button class="act-btn" data-action="hydrate">💧 수분 알림</button>
-            <button class="act-btn" data-action="posture">🛡️ 자세 권고</button>
-            <button class="act-btn" data-action="patrol">📍 현장 순찰</button>
-          </div>
-          <div id="actionLog" class="log"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ORG -->
-    <section id="tab-org" class="tab">
-      <div class="card">
-        <div class="card-hd">조직 업무 보드</div>
-        <div class="toolbar">
-          <select id="deptFilter">
-            <option value="ALL">전체</option>
-            <option value="기획예산">기획예산</option>
-            <option value="민원서비스">민원서비스</option>
-            <option value="안전도시">안전도시</option>
-            <option value="문화관광">문화관광</option>
-          </select>
-          <button id="addTask" class="pill-btn">업무 추가</button>
-          <button id="exportCsv" class="pill-btn ghost">CSV 내보내기</button>
-        </div>
-        <div id="taskList" class="list"></div>
-      </div>
-    </section>
-
-    <!-- BUYER -->
-    <section id="tab-buyer" class="tab">
-      <div class="card">
-        <div class="card-hd">Global Buyer Connect</div>
-        <div class="toolbar">
-          <select id="buyerSelect">
-            <option value="">바이어 선택</option>
-          </select>
-          <div id="buyerTime" class="muted"></div>
-        </div>
-        <div class="actions">
-          <button class="pill-btn" id="mkJitsi">Jitsi 링크</button>
-          <button class="pill-btn" id="mkMeet">Google Meet</button>
-          <button class="pill-btn" id="mkZoom">Zoom</button>
-          <button class="pill-btn ghost" id="mkICS">ICS 초대장</button>
-        </div>
-        <div class="muted small">※ 정적판: 링크 생성은 브라우저에서 처리(새창).</div>
-      </div>
-    </section>
-
-    <!-- ASSISTANT -->
-    <section id="tab-assistant" class="tab">
-      <div class="card">
-        <div class="card-hd">AI 비서 (정적 모드)</div>
-        <div id="chatBox" class="chat-box"></div>
-        <div class="chat-input">
-          <input id="chatInput" placeholder="메모/날씨/긴급 등 지시를 입력…" />
-          <button id="sendBtn" class="pill-btn">보내기</button>
-        </div>
-        <div class="muted small">
-          ※ 지금은 <b>정적 모드</b>로 동작합니다. 필요 시 <code>CHAT_API_URL</code>에
-          서버/워커 엔드포인트를 연결하면 실제 생성형 응답으로 전환됩니다.
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <span>© 2025 Mayor Mirror PRO · Static</span>
-    <span id="status">PWA: <b id="pwaState">로딩중</b></span>
-  </footer>
+    <h3>결과</h3>
+    <pre id="result">결과 대기중...</pre>
+  </div>
 
   <script>
-    // 필요 시 서버(워커) 붙일 엔드포인트 — 비워두면 정적 모드
-    window.APP_CONFIG = {
-      CHAT_API_URL: "",   // 예: "https://your-worker.yourname.workers.dev/api/chat"
-    };
-  </script>
-  <script src="./assets/js/mirror.js"></script>
-  <script>
-  let deferredPrompt = null;
-  const installBtn = document.getElementById('installBtn');
-
-  // ① beforeinstallprompt 발생 시 저장하고 버튼 표시
-  window.addEventListener
-('beforeinstallprompt', (e) => {
-    e.preventDefault();            // 크롬 기본 배너 억제
-    deferredPrompt = e;            // 이벤트 보관
-    installBtn.style.display = 'inline-flex'; // 우리 버튼 노출
-  });
-
-  // ② 버튼 클릭 → 설치 프롬프트 강제 표시
-  installBtn.addEventListener
-('click', async () => {
-    if (!deferredPrompt) {
-      alert('설치 프롬프트가 아직 준비되지 않았습니다.');
-      return;
+    async function askGemini(prompt){
+      try{
+        const res = await fetch('/api/ai', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+        const j = await res.json();
+        return j;
+      }catch(e){
+        return { error: String(e) };
+      }
     }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice
-; // accepted / dismissed
-    // 한번 사용하면 이벤트는 무효화됨
-    deferredPrompt = null;
-    installBtn.style.display = 'none';
-    console.log('PWA install result:', outcome);
-  });
 
-  // ③ 설치 완료 감지(축하/안내 메시지 등)
-  window.addEventListener
-('appinstalled', () => {
-    console.log('PWA installed!');
-    installBtn.style.display = 'none';
-  });
-</script>
+    document.getElementById('send').addEventListener('click', async ()=>{
+      const prompt = document.getElementById('prompt').value.trim();
+      if(!prompt){ alert('프롬프트를 입력하세요'); return; }
+      document.getElementById('result').textContent = '요청중...';
+      const r = await askGemini(prompt);
+      // 보기 쉬운 형태로 출력
+      document.getElementById('result').textContent = JSON.stringify(r, null, 2);
+    });
+
+    document.getElementById('clear').addEventListener('click', ()=> {
+      document.getElementById('result').textContent = '';
+    });
+  </script>
 </body>
 </html>
