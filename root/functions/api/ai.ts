@@ -182,5 +182,21 @@ function asBool(...vals: any[]) {
   }
   return false;
         }
+// 텍스트 정제 함수 (특수문자 전체 제거)
+function cleanTextForSpeech(text: string): string {
+  return text.replace(/[^가-힣a-zA-Z0-9\s]/g, "");  
+  // → 한글, 영어, 숫자, 공백만 남기고 전부 삭제
+}
 
+// 음성 합성 호출 부분
+async function speakText(text: string) {
+  const cleanText = cleanTextForSpeech(text);
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  utterance.lang = "ko-KR";  // 한국어
+  utterance.rate = 1.0;      // 말하기 속도
+  utterance.pitch = 1.0;     // 목소리 톤
+
+  speechSynthesis.speak(utterance);
+}
    
