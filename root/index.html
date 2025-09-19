@@ -95,5 +95,95 @@
       }
     });
   </script>
+  <!-- ===================== AI 비서 대화 영역 ===================== -->
+<section id="ai-assistant" style="padding:2rem; background:#0b0f19; color:#fff; min-height:100vh;">
+  <h2>시장님 AI 비서</h2>
+
+  <!-- 채팅 입력/출력 -->
+  <div id="chat-box" style="height:300px; overflow-y:auto; background:#111; padding:1rem; border-radius:8px; margin-bottom:1rem;"></div>
+
+  <div style="display:flex; gap:0.5rem;">
+    <input id="chat-input" type="text" placeholder="메시지를 입력하세요..."
+      style="flex:1; padding:0.5rem; border-radius:4px; border:none;">
+    <button id="send-btn">보내기</button>
+    <button id="voice-btn">🎤 음성</button>
+  </div>
+</section>
+
+<script>
+async function askGemini(prompt) {
+  const res = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'AI error');
+  return data.text;
+}
+
+// 채팅 박스 업데이트
+function appendMessage(sender, text) {
+  const box = document.getElementById('chat-box');
+  const msg = document.createElement('div');
+  msg.innerHTML = `<b>${sender}:</b> ${text}`;
+  msg.style.marginBottom = "0.5rem";
+  box.appendChild(msg);
+  box.scrollTop = box.scrollHeight;
+}
+
+// 보내기 버튼
+document.getElementById('send-btn').addEventListener('click', async () => {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  appendMessage('시장님', text);
+  input.value = '';
+  try {
+    const reply = await askGemini(text);
+    appendMessage('AI 비서', reply);
+    speak(reply);
+  } catch (err) {
+    appendMessage('시스템', '⚠️ 오류: ' + err.message);
+  }
+});
+
+// 엔터키도 전송
+document.getElementById('chat-input').addEventListener('keypress', e => {
+  if (e.key === 'Enter') document.getElementById('send-btn').click();
+});
+
+// 음성인식 (Web Speech API, 크롬/엣지 지원)
+let recognition;
+if ('webkitSpeechRecognition' in window) {
+  recognition = new webkitSpeechRecognition();
+  recognition.lang = 'ko-KR';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript;
+    document.getElementById('chat-input').value = text;
+    document.getElementById('send-btn').click();
+  };
+}
+
+document.getElementById('voice-btn').addEventListener('click', () => {
+  if (!recognition) {
+    alert('이 브라우저는 음성인식을 지원하지 않습니다.');
+    return;
+  }
+  recognition.start();
+});
+
+// 음성 출력 (TTS)
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'ko-KR';
+  utter.rate = 1.0;
+  speechSynthesis.speak(utter);
+}
+</script>
+<!-- =========================================================== -->
 </body>
 </html>
