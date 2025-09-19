@@ -1,39 +1,69 @@
 // functions/api/ai.ts
-export const onRequest: PagesFunction = async (context) => {
-  const { request, env } = context;
+// POST /api/ai  { "prompt": "..." }
+
+export const onRequest: PagesFunction = async ({ request, env }) => {
   try {
-    const { prompt } = await request.json();
-    if (!prompt) {
-      return new Response(JSON.stringify({ error: "prompt is required" }), { status: 400 });
+    if (request.method
+ !== "POST") {
+      return new Response("Method Not Allowed", { status: 405 });
     }
 
-    const apiKey = env.GEMINI_API_KEY; // ← 환경변수
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const { prompt } = await request.json().catch(() => ({}));
+    if (!prompt) {
+      return new Response(JSON.stringify({ error: "prompt is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const apiKey = env.GEMINI_API_KEY;
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/
+` +
+      `gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const body = {
       contents: [{ role: "user", parts: [{ text: prompt }]}],
     };
 
-    const res = await fetch(url, {
+    const upstream = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      return new Response(JSON.stringify({ error: "Gemini API error", detail: text }), { status: 500 });
+    if (!upstream.ok) {
+      const detail = await upstream.text();
+      return new Response(JSON.stringify({ error: "Gemini API error", detail }), {
+        status: 502,
+        headers: corsJson(),
+      });
     }
 
-    const data = await res.json();
-    // 응답에서 텍스트 추출 (구글 응답 포맷 기준)
+    const data = await upstream.json();
     const text =
       data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") ?? "";
 
     return new Response(JSON.stringify({ text }), {
-      headers: { "Content-Type": "application/json" },
+      status: 200,
+      headers: corsJson(),
     });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message ?? "unknown error" }), { status: 500 });
+    return new Response(JSON.stringify({ error: e?.message ?? "unknown error" }), {
+      status: 500,
+      headers: corsJson(),
+    });
   }
 };
+
+// 공통 헤더(브라우저 호출 편의용)
+function corsJson() {
+  return {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+
+
+   
