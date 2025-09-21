@@ -1,0 +1,49 @@
+<!-- about.html -->
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>스마트미러 PRO · 도움말 / 라이선스</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .doc{max-width:960px;margin:40px auto;padding:0 16px}
+    .doc h1,.doc h2{margin:16px 0}
+    .doc code{background:#1112; padding:2px 6px; border-radius:4px}
+    .pill{display:inline-block;padding:.15rem .5rem;border-radius:.5rem;font-size:.8rem;background:#eef}
+    .pill.pro{background:#fee}
+  </style>
+</head>
+<body>
+  <main class="doc">
+    <h1>스마트미러 PRO 도움말</h1>
+
+    <h2>기능 요약</h2>
+    <ul>
+      <li>AI 비서(채팅+음성) <span class="pill">기본 서비스</span></li>
+      <li>시장님 일정 <span class="pill">무료</span></li>
+      <li>시정뉴스 <span class="pill">무료 / 기관배포는 유료</span></li>
+      <li>부서별 업무보고 <span class="pill pro">유료(부서장 전용)</span></li>
+    </ul>
+
+    <h2>유료/무료 정책</h2>
+    <ul>
+      <li><b>일정</b>: 무료 (기본 탑재)</li>
+      <li><b>업무보고</b>: 유료. 부서 계정/권한/감사 로그 제공</li>
+      <li><b>시정뉴스</b>: 시민 공지 무료, 기관 대량 송출·전용앱 연동은 유료</li>
+    </ul>
+
+    <h2>키 설정</h2>
+    <ol>
+      <li>Cloudflare Pages → <b>Settings → Variables</b>에서 환경변수 추가</li>
+      <li><code>GEMINI_API_KEY</code>, <code>KMA_SERVICE_KEY</code> 등</li>
+      <li>저장 후 <b>Deployments → Trigger redeploy</b></li>
+    </ol>
+
+    <h2>문의</h2>
+    <p>유지보수/기능확장/기관배포 라이선스: 총괄실장팀에 문의하세요.</p>
+
+    <p><a href="/">← 돌아가기</a></p>
+  </main>
+</body>
+</html>
