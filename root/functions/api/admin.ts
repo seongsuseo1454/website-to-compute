@@ -1,24 +1,22 @@
-export async function onRequest({ request, env }: { request: Request; env: any }) {
-  const kv = env.MIRROR_KV as KVNamespace;
-  if (request.method
- === 'GET') {
-    const listKey = new URL(request.url).searchParams.get('list');
-    if (!listKey) return Response.json([]);
-    const raw = (await kv.get(listKey)) || '[]';
-    return new Response(raw, { headers: { 'Content-Type': 'application/json' } });
+// functions/api/admin.ts
+export const onRequestPost: PagesFunction = async ({ request, env }) => {
+  // 헤더나 쿼리에 실은 토큰 확인
+  const url = new URL(request.url);
+  const token =
+    request.headers.get("x-admin-token") || url.searchParams.get("token");
+
+  if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) {
+    return new Response("forbidden", { status: 403 });
   }
 
-  if (request.method
- === 'POST') {
-    const { token, kind, payload } = await request.json();
-    if (!token || token !== env.ADMIN
-_TOKEN) return new Response('forbidden', { status: 403 });
-    const key = String(kind || 'NEWS');
-    const arr = JSON.parse((await kv.get(key)) || '[]');
-    arr.unshift(payload);
-    await kv.put(key, JSON.stringify(arr.slice(0, 200)));
-    return Response.json({ ok: true, msg: '저장되었습니다.' });
-  }
-
-  return new Response('method', { status: 405 });
-}
+  // 간단한 헬스체크/관리 작업 응답
+  const body = await request.text().catch(() => "");
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      received: body || null,
+      at: new Date().toISOString(),
+    }),
+    { headers: { "content-type": "application/json" } }
+  );
+};
