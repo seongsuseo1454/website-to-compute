@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>시장님 집무실 · 스마트 미러 PRO</title>
 
-  <!-- PWA & 아이콘 -->
+  <!-- PWA -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" sizes="192x192" href="/icon-192.png" />
   <link rel="icon" sizes="512x512" href="/icon-512.png" />
@@ -13,139 +13,145 @@
 
   <link rel="stylesheet" href="/style.css" />
   <style>
-    :root { --card:#141a21; --muted:#8ea1b5; --accent:#3b82f6; --danger:#ef4444; }
-    body{background:#0b0f19;color:#e5edf5;font-family:system-ui,Apple SD Gothic Neo,Segoe UI,Roboto,Arial}
-    .container{max-width:1100px;margin:28px auto;padding:0 16px}
-    .row{display:grid;gap:16px}
-    .hero{display:flex;justify-content:space-between;align-items:flex-end;
-          background:linear-gradient(135deg,#141a21 0%,#0f1520 100%);
-          border-radius:18px;padding:22px 24px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
-    .hero h1{font-size:28px;margin:0 0 6px 0}
-    .hero .sub{color:var(--muted);margin:0}
-    .badge{border:1px solid rgba(255,255,255,.2);padding:6px 10px;border-radius:999px;color:#bfead9;font-size:13px}
+    /* ---- 최소 스타일 보강 (기존 style.css 그대로 두고, 부족분만 덧입힘) ---- */
+    body { background:#0b0f19; color:#e9eef7; font-family: system-ui, -apple-system, "Noto Sans KR", sans-serif; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .hero { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .clock { font-size: 48px; font-weight: 700; }
+    .card { background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:16px; margin:16px 0; backdrop-filter: blur(8px); }
+    .card-title { font-weight:700; margin-bottom:8px; }
+    .chat { max-height: 240px; overflow:auto; display:flex; flex-direction:column; gap:8px; padding:8px; background: rgba(255,255,255,0.04); border-radius:12px; }
+    .chat .user { align-self:flex-end; background:#2d5cf6; color:#fff; padding:10px 12px; border-radius:12px 12px 4px 12px; max-width:80%; }
+    .chat .bot { align-self:flex-start; background: rgba(255,255,255,0.1); padding:10px 12px; border-radius:12px 12px 12px 4px; max-width:80%; }
+    .chat-form { display:flex; gap:8px; margin-top:8px; }
+    .chat-form input { flex:1; padding:12px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color:#fff; }
+    .primary { background:#2d5cf6; border:none; color:#fff; padding:12px 16px; border-radius:10px; }
+    .ghost { background:transparent; border:1px solid rgba(255,255,255,0.18); color:#e9eef7; padding:12px 14px; border-radius:10px; }
+    .danger { border-color:#ff5a5f; color:#ff5a5f; }
+    .tts-row { display:flex; align-items:center; gap:8px; margin-top:10px; }
+    .spacer { flex:1; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .col { flex:1 1 380px; min-width:280px; }
+    .footer { margin-top:24px; opacity:0.7; font-size:14px; }
 
-    .card{background:var(--card);border-radius:18px;padding:18px 18px 16px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
-    .card h3{margin:2px 0 12px 2px}
-    .kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .kv div{background:#0f1520;border:1px solid rgba(255,255,255,.06);padding:12px;border-radius:12px}
-    .kv .v{font-size:28px}
-    .btn{background:#1a2430;border:1px solid rgba(255,255,255,.18);padding:10px 14px;border-radius:12px;cursor:pointer}
-    .btn:hover{background:#223042}
-    .btn.primary{background:var(--accent);border:none;color:white}
-    .btn.danger{background:#2a0e10;border:1px solid #7a1b23}
-    .row-2{display:grid;grid-template-columns:1fr;gap:16px}
-    @media(min-width:960px){ .row-2{grid-template-columns:1fr 1fr} }
+    /* 큰 마이크 버튼 (모바일 쉽게 누르게) */
+    #micBtn { font-size: 22px; padding: 14px 16px; border-radius: 14px; }
 
-    .chat{height:240px;overflow:auto;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;background:#0f1520}
-    .bubble{max-width:90%;margin:6px 0;padding:12px;border-radius:14px;line-height:1.5}
-    .bubble.bot
-{background:#16202c;color:#e6f0ff}
-    .bubble.user
-{margin-left:auto;background:#2b3b4e}
-    .chat-form{display:flex;gap:8px;margin-top:10px}
-    .chat-input{flex:1;border:1px solid rgba(255,255,255,.15);border-radius:12px;background:#0f1520;color:#dfe8f5;padding:12px 12px}
-    .opt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:#a9b8c8;margin-top:8px}
-    .mic-big{font-size:22px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#1a2430}
+    /* 통역 결과 그리드 */
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap:10px; }
+    .pill { background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); padding:10px; border-radius:12px; font-size:14px; }
+    .lang { opacity:0.7; font-size:12px; margin-bottom:6px; }
 
-    .footer{opacity:.7;margin:16px 2px 32px 2px}
-    .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
+    /* 날씨 카드 */
+    .weather-row { display:flex; align-items:center; gap:14px; }
+    .wx-temp { font-size: 42px; font-weight: 800; }
+    .wx-small { opacity:0.75; font-size: 14px; }
   </style>
 </head>
 <body>
-  <main class="container">
-    <!-- 상단 인사/시계 -->
-    <section class="hero">
-      <div>
-        <h1 id="greet">시장님 안녕하세요</h1>
-        <p class="sub" id="today">YYYY.MM.DD (요일)</p>
+<main class="container">
+  <!-- 상단 인사/시계 -->
+  <section class="hero">
+    <div>
+      <h1 id="greet">활기찬 하루입니다, 시장님</h1>
+      <p class="sub" id="today"></p>
+    </div>
+    <div class="clock" id="clock">--:--</div>
+  </section>
+
+  <div class="row">
+    <!-- AI 비서 (채팅 + 음성) -->
+    <section class="card col">
+      <header class="card-title">AI 비서 (채팅 + 음성)</header>
+      <div id="chat" class="chat">
+        <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
       </div>
-      <div>
-        <div class="badge">루미나 스마트 비서</div>
+
+      <form id="chatForm" class="chat-form">
+        <button type="button" id="micBtn" title="음성으로 말하기" class="ghost">🎤 말하기</button>
+        <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
+        <button type="submit" class="primary">보내기</button>
+      </form>
+
+      <div class="tts-row">
+        <label><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
+        <div class="spacer"></div>
+        <button id="ttsPause" class="ghost">⏸︎ 일시정지</button>
+        <button id="ttsResume" class="ghost">▶︎ 재개</button>
+        <button id="ttsStop" class="danger ghost">■ 정지</button>
       </div>
+
+      <p class="hint" style="opacity:.7;margin-top:8px;">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
     </section>
 
-    <!-- 날씨 -->
-    <section class="card" id="weatherCard">
-      <h3>현재 날씨</h3>
-      <div class="kv" style="margin-bottom:10px">
-        <div><div style="color:var(--muted)">온도</div><div id="w-temp" class="v">- °C</div></div>
-        <div><div style="color:var(--muted)">습도</div><div id="w-hum" class="v">- %</div></div>
-        <div><div style="color:var(--muted)">강수</div><div id="w-rain" class="v">- mm</div></div>
-        <div><div style="color:var(--muted)">풍속</div><div id="w-wind" class="v">- m/s</div></div>
+    <!-- 오늘의 날씨 (키 없이 동작: Open-Meteo + 브라우저 위치 / 위치거부 시 논산 좌표) -->
+    <section class="card col">
+      <header class="card-title">오늘의 날씨</header>
+      <div class="weather-row">
+        <div>
+          <div id="wx-temp" class="wx-temp">--°</div>
+          <div id="wx-desc" class="wx-small">날씨 정보를 가져오는 중…</div>
+          <div id="wx-where" class="wx-small"></div>
+        </div>
       </div>
-      <button class="btn" id="btnWeather">날씨 업데이트</button>
+      <p class="wx-small" style="margin-top:8px;opacity:.7">
+        ※ 위치 허용 시 현재 위치 기준, 거부 시 논산시 기준(무키 Open-Meteo).
+      </p>
     </section>
+  </div>
 
-    <div class="row-2">
-      <!-- AI 비서 (채팅 + 음성) -->
-      <section class="card">
-        <h3>AI 비서 채팅</h3>
-        <div id="chat" class="chat">
-          <div class="bubble bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
-        </div>
-        <form id="chatForm" class="chat-form">
-          <button type="button" id="micBtn" class="mic-big" title="음성으로 말하기">🎙️</button>
-          <input id="msgInput" class="chat-input" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
-          <button type="submit" class="btn primary">보내기</button>
-        </form>
-        <div class="opt">
-          <label><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
-          <button id="ttsPause" class="btn">⏸︎ 일시정지</button>
-          <button id="ttsResume" class="btn">▶︎ 재개</button>
-          <button id="ttsStop" class="btn danger">■ 정지</button>
-          <span style="margin-left:auto;color:#7d8b9a">※ 특수문자/이모지/마크다운은 읽기 전에 자동 정리</span>
-        </div>
-      </section>
+  <!-- 14개 언어 동시 통역 -->
+  <section class="card">
+    <header class="card-title">동시 통역 (14개 언어)</header>
 
-      <!-- 실시간 통역(듀얼 모드) -->
-      <section class="card">
-        <h3>실시간 통역</h3>
-        <div class="opt">
-          <label>입력(말하기) 언어
-            <select id="langIn">
-              <option value="ko">한국어</option>
-              <option value="en">English</option>
-              <option value="ja">日本語</option>
-              <option value="zh">中文</option>
-            </select>
-          </label>
-          <label>출력(읽어주기) 언어
-            <select id="langOut">
-              <option value="ko">한국어</option>
-              <option value="en">English</option>
-              <option value="ja">日本語</option>
-              <option value="zh">中文</option>
-            </select>
-          </label>
-          <button id="trStart" class="btn">🎤 통역 시작</button>
-          <button id="trStop" class="btn danger">■ 통역 정지</button>
-        </div>
-        <div id="trLog" class="chat" style="height:180px;margin-top:8px"></div>
-      </section>
+    <div class="row" style="align-items:flex-end">
+      <div class="col">
+        <label for="sttLang">입력(음성 인식) 언어</label>
+        <select id="sttLang" class="ghost" style="width:100%;padding:10px;border-radius:10px;margin-top:6px">
+          <!-- ai.js에서 LANGS로 동기화 -->
+        </select>
+      </div>
+      <div class="col">
+        <button id="sttStart" class="primary" type="button">🎙️ 통역 시작</button>
+        <button id="sttStop" class="ghost" type="button" style="margin-left:8px">■ 통역 정지</button>
+      </div>
     </div>
 
-    <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
-  </main>
+    <div id="interpret-src" class="pill" style="margin-top:10px;opacity:.9"></div>
 
-  <div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
+    <div id="interpret-grid" class="grid" style="margin-top:10px"></div>
+  </section>
 
-  <!-- 메인 로직 -->
-  <script type="module" src="/ai.js"></script>
+  <!-- 바닥 표시 -->
+  <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
+</main>
 
-  <script>
-    // 오류 배지
-    addEventListener('error', ()=> document.getElementById('errorBadge').style.display='block');
-    addEventListener('unhandledrejection', ()=> document.getElementById('errorBadge').style.display='block');
+<!-- 비서/통역/날씨 로직 -->
+<script src="/ai.js"></script>
 
-    // 시계
-    const todayEl = document.getElementById('today');
-    function tick(){
-      const now=new Date();
-      const d=now.toLocaleDateString
-('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'});
-      todayEl.textContent=d;
-    }
-    setInterval(tick,1000); tick();
-  </script>
+<!-- 에러 배지(자동 리포트는 ai.js 내부에 포함) -->
+<style>
+  .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
+</style>
+<div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
+<script>
+  window.addEventListener
+('error', ()=>{ document.getElementById('errorBadge').style.display='block'; });
+  window.addEventListener
+('unhandledrejection', ()=>{ document.getElementById('errorBadge').style.display='block'; });
+
+  // 시계/날짜
+  function tick() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString
+('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('today').textContent =
+      now.toLocaleDateString
+('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long' });
+  }
+  setInterval(tick, 1000); tick();
+</script>
+<script type="module" src="/ai.js">  
 </body>
 </html>
