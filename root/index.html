@@ -2,90 +2,180 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>시장 집무실 스마트 미러 PRO</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>시장님 집무실 · 스마트 미러 PRO</title>
 
   <!-- PWA -->
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+  <link rel="icon" sizes="192x192" href="/icon-192.png" />
+  <link rel="icon" sizes="512x512" href="/icon-512.png" />
   <meta name="theme-color" content="#0b0f19" />
 
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="profile">
-      <div class="avatar" aria-hidden="true"></div>
-      <div class="greet">
-        <div id="greeting">안녕하세요, 시장님</div>
-        <div id="subtitle" class="muted">오늘도 좋은 하루 되세요.</div>
+  <main class="container">
+    <!-- 상단 인사/시계 -->
+    <section class="hero">
+      <div>
+        <h1 id="greet">활기찬 하루입니다, 시장님</h1>
+        <p class="sub" id="today"></p>
       </div>
-    </div>
-    <div class="meta">
-      <div id="clock" class="clock">--:--</div>
-      <div id="date" class="muted">YYYY.MM.DD (—)</div>
-      <div id="weather" class="muted">날씨 가져오는 중...</div>
-    </div>
-  </header>
-
-  <main class="grid">
-    <!-- 중앙 건강 요약/AI 카드 -->
-    <section class="card" id="ai-card">
-      <h2>AI 비서</h2>
-
-      <div class="chat">
-        <div id="chat-log" class="chat-log" aria-live="polite"></div>
-
-        <div class="chat-controls">
-          <button id="mic-btn" class="btn" title="음성으로 말하기(토글)">🎤</button>
-          <input id="chat-input" class="input" type="text" placeholder="지시사항을 말씀하거나 입력하세요…" />
-          <button id="send-btn" class="btn primary">보내기</button>
-        </div>
-
-        <div class="tts-controls">
-          <button id="speak-last" class="btn" title="마지막 답변 읽어주기">🔊 읽어주기</button>
-          <button id="stop-speak" class="btn" title="음성 중지">⏹️ 중지</button>
-        </div>
-
-        <div id="hint" class="muted small">
-          ※ 특수문자/마크다운/이모지 등은 음성 읽기 전에 자동 정리됩니다.
-        </div>
-      </div>
+      <div class="clock" id="clock">--:--</div>
     </section>
 
-    <!-- 오늘의 지혜 -->
-    <section class="card" id="insight-card">
-      <h2>오늘의 지혜</h2>
-      <div id="insight-text" class="insight">“건강은 가장 큰 재산입니다.” — 버지니아 울프</div>
-      <div class="row">
-        <button id="read-insight" class="btn">🔊 명언 읽기</button>
-        <button id="stop-insight" class="btn">⏹️ 중지</button>
+    <!-- AI 비서 (채팅 + 음성) -->
+    <section class="card">
+      <header class="card-title">AI 비서 (채팅 + 음성)</header>
+
+      <div id="chat" class="chat">
+        <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
       </div>
+
+      <form id="chatForm" class="chat-form">
+        <button type="button" id="micBtn" title="음성으로 말하기" class="ghost">🎤</button>
+        <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
+        <button type="submit" class="primary">보내기</button>
+      </form>
+
+      <div class="tts-row">
+        <label><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
+        <div class="spacer"></div>
+        <button id="ttsPause" class="ghost">⏸︎ 일시정지</button>
+        <button id="ttsResume" class="ghost">▶︎ 재개</button>
+        <button id="ttsStop" class="danger ghost">■ 정지</button>
+      </div>
+
+      <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
     </section>
 
-    <!-- 상태/목표 -->
-    <section class="card" id="status-card">
-      <h2>오늘의 권장</h2>
-      <ul id="ai-reco" class="list">
-        <li>가벼운 스트레칭 10분</li>
-        <li>물 8잔(하루)</li>
-        <li>점심 후 15분 산책</li>
-      </ul>
-    </section>
+    <!-- 바닥 표시 -->
+    <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
   </main>
 
-  <footer class="bottombar">
-    <div>© 스마트 미러 PRO</div>
-    <div class="muted small">PWA 설치: 브라우저 메뉴 &gt; 홈 화면에 추가</div>
-  </footer>
-
-  <script type="module" src="/ai.js"></script>
+  <!-- 비서 로직(선행 제공된 /ai.js 사용). 없으면 안전한 폴백 fetch 사용 -->
+  <script src="/ai.js"></script>
   <script>
-    // PWA SW 등록
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js').catch(console.error);
+    // ===== 공통 유틸 =====
+    const $ = (sel) => document.querySelector(sel);
+    const chat = $('#chat');
+    const input = $('#msgInput');
+    const form = $('#chatForm');
+    const micBtn = $('#micBtn');
+    const ttsToggle = $('#ttsToggle');
+    const ttsPause = $('#ttsPause');
+    const ttsResume = $('#ttsResume');
+    const ttsStop = $('#ttsStop');
+
+    // 특수문자/이모지/마크다운 제거(음성용)
+    function sanitizeForTTS(text) {
+      return (text ?? '')
+        .replace(/[#*_`>~|[\](){}+-]+/g, ' ')
+        .replace(/https?:\/\/\S+/g, ' ')
+        .replace(/[:;=8xX]-?[\)D\(PpOo\/\\]|🧡|❤️|[\u{1F300}-\u{1FAFF}]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
+
+    // 채팅 말풍선 추가
+    function pushMsg(role, text) {
+      const div = document.createElement('div');
+      div.className = role === 'user' ? 'user' : 'bot';
+      div.textContent = text;
+      chat.appendChild
+(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // 시계/날짜
+    function tick() {
+      const now = new Date();
+      $('#clock').textContent =
+        now.toLocaleTimeString
+('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      $('#today').textContent =
+        now.toLocaleDateString
+('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long' });
+    }
+    setInterval(tick, 1000); tick();
+
+    // ===== 음성 합성(TTS) =====
+    function speak(text) {
+      if (!ttsToggle.checked) return;
+      const line = sanitizeForTTS(text);
+      if (!line) return;
+      window.speechSynthesis.cancel
+();
+      const u = new SpeechSynthesisUtterance(line);
+      u.lang = 'ko-KR';
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      window.speechSynthesis.speak(u);
+    }
+    ttsPause.onclick = () => window.speechSynthesis.pause();
+    ttsResume.onclick = () => window.speechSynthesis.resume();
+    ttsStop.onclick = () => window.speechSynthesis.cancel
+();
+
+    // ===== 음성 인식(STT) =====
+    let rec;
+    if ('webkitSpeechRecognition' in window) {
+      const R = window.webkitSpeechRecognition;
+      rec = new R();
+      rec.lang = 'ko-KR';
+      rec.continuous
+ = false;
+      rec.interimResults
+ = false;
+      rec.onresult = (e) => {
+        const txt = e.results[0][0].transcript;
+        input.value = txt;
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      };
+      rec.onerror = () => alert('음성 인식 중 오류가 발생했습니다. 다시 시도해 주세요.');
+    } else {
+      micBtn.disabled = true;
+      micBtn.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
+    }
+    micBtn.onclick = () => { try { rec && rec.start(); } catch(_) {} };
+
+    // ===== AI 호출: ai.js 있으면 사용, 없으면 /api/ai 폴백 =====
+    async function callAI(prompt) {
+      if (typeof window.askAI === 'function') {
+        return await window.askAI(prompt);   // ai.js에서 정의한 함수 사용
+      }
+      // 폴백(fetch)
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      if (!res.ok) throw new Error('AI 응답 실패');
+      const data = await res.json();
+      return data.text || data.reply || JSON.stringify(data);
+    }
+
+    // ===== 전송 처리 =====
+    form.addEventListener
+('submit', async (e) => {
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q) return;
+      input.value = '';
+      pushMsg('user', q);
+
+      try {
+        const a = await callAI(q);
+        pushMsg('bot', a);
+        speak(a);
+      } catch (err) {
+        const msg = '에러가 발생했습니다. 곧 조치하겠습니다.';
+        pushMsg('bot', msg);
+        speak(msg);
+        // 여기에 원격 알림 훅을 연결할 수 있습니다 (예: /api/alert)
+        // fetch('/api/alert', { method:'POST', body: JSON.stringify({ type:'AI_FAIL', detail: String(err) }) })
+      }
+    });
   </script>
 </body>
 </html>
