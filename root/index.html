@@ -11,7 +11,34 @@
   <link rel="icon" sizes="512x512" href="/icon-512.png" />
   <meta name="theme-color" content="#0b0f19" />
 
+  <!-- 선택: 기존 style.css 유지 -->
   <link rel="stylesheet" href="/style.css" />
+  <style>
+    /* 최소한의 기본 스타일 (style.css 없을 경우 대비) */
+    body{margin:0;background:#0b0f19;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    .hero{display:flex;align-items:end;justify-content:space-between;margin:8px 0 20px}
+    .hero h1{margin:.2rem 0;font-size:28px}
+    .sub{opacity:.8;margin:0}
+    .clock{font-size:40px;font-weight:700}
+    .card{background:rgba(255,255,255,.08);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.15);
+          border-radius:16px;padding:16px}
+    .card-title{font-weight:700;margin-bottom:10px}
+    .chat{display:flex;flex-direction:column;gap:8px;max-height:42vh;overflow:auto;padding:8px;background:rgba(0,0,0,.2);
+          border-radius:12px}
+    .chat .user{align-self:flex-end;background:#2d6cdf;color:#fff;padding:10px 12px;border-radius:14px 14px 2px 14px;max-width:80%}
+    .chat .bot{align-self:flex-start;background:#1c2333;color:#e9ecf4;padding:10px 12px;border-radius:14px 14px 14px 2px;max-width:80%}
+    .chat-form{display:flex;gap:8px;margin-top:10px}
+    .chat-form input{flex:1;padding:12px;border-radius:10px;border:1px solid #3a4361;background:#0f1525;color:#e9ecf4}
+    .primary{background:#2d6cdf;color:#fff;border:0;padding:12px 16px;border-radius:10px;cursor:pointer}
+    .ghost{background:transparent;color:#cdd5ff;border:1px solid #3a4361;padding:10px 12px;border-radius:10px;cursor:pointer}
+    .danger{color:#ff9ea0;border-color:#6b1e25}
+    .tts-row{display:flex;align-items:center;gap:10px;margin-top:8px}
+    .spacer{flex:1}
+    .footer{opacity:.6;margin-top:20px;text-align:center}
+    .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;
+                 font-size:12px;display:none;z-index:9999}
+  </style>
 </head>
 <body>
 <main class="container">
@@ -32,9 +59,9 @@
       <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
     </div>
 
-    <form id="chatForm" class="chat-form">
+    <form id="chatForm" class="chat-form" autocomplete="off">
       <button type="button" id="micBtn" title="음성으로 말하기" class="ghost">🎤</button>
-      <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
+      <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" />
       <button type="submit" class="primary">보내기</button>
     </form>
 
@@ -46,36 +73,34 @@
       <button id="ttsStop" class="danger ghost">■ 정지</button>
     </div>
 
-    <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
+    <p class="sub" style="margin-top:6px;opacity:.75">
+      ※ 특수문자/이모지/마크다운은 자동 정리 후 읽습니다.
+    </p>
   </section>
 
-  <!-- 바닥 표시 -->
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
 
 <!-- 에러 배지 -->
-<style>
-  .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
-</style>
 <div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
 
-<!-- AI 로직 -->
-<script src="/ai.js"></script>
+<!-- 앱 스크립트 (모듈) -->
+<script type="module">
+  import { sanitizeForTTS, askAI, reportClientError } from './ai.js';
 
-<script>
-  // ========= DOM 단축 =========
-  const $ = (s)=>document.querySelector(s);
-  const chat = $('#chat');
-  const input = $('#msgInput');
-  const form = $('#chatForm');
+  // ===== DOM 참조 =====
+  const $      = (s) => document.querySelector(s);
+  const chat   = $('#chat');
+  const form   = $('#chatForm');
+  const input  = $('#msgInput');
   const micBtn = $('#micBtn');
-  const ttsToggle = $('#ttsToggle');
-  const ttsPause = $('#ttsPause');
+  const ttsOn  = $('#ttsToggle');
+  const ttsPause  = $('#ttsPause');
   const ttsResume = $('#ttsResume');
-  const ttsStop = $('#ttsStop');
+  const ttsStop   = $('#ttsStop');
 
-  // ========= 시계/날짜 =========
-  function tick(){
+  // ===== 시계/날짜 =====
+  function tick() {
     const now = new Date();
     $('#clock').textContent = now.toLocaleTimeString
 ('ko-KR',{hour:'2-digit',minute:'2-digit'});
@@ -84,99 +109,83 @@
   }
   setInterval(tick,1000); tick();
 
-  // ========= 채팅 말풍선 =========
-  function pushMsg(role, text){
+  // ===== 채팅 UI =====
+  function pushMsg(role, text) {
     const div = document.createElement('div');
-    div.className = role==='user' ? 'user' : 'bot';
+    div.className = role === 'user' ? 'user' : 'bot';
     div.textContent = text;
     chat.appendChild
 (div);
     chat.scrollTop = chat.scrollHeight;
   }
 
-  // ========= TTS(특수문자/이모지 정리) =========
-  function sanitizeForTTS(text){
-    return (text??'')
-      .replace(/https?:\/\/\S+/g,' ')               // URL 제거
-      .replace(/[#*_`>~|[\](){}/+\-=]/g,' ')        // 마크다운/기호 제거
-      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g,' ')// 서러게이트 쌍(이모지) 제거
-      .replace(/\s+/g,' ').trim();
-  }
-  function speak(text){
-    if(!ttsToggle.checked) return;
-    const line = sanitizeForTTS(text);
-    if(!line) return;
-    speechSynthesis.cancel
+  // ===== TTS 제어 =====
+  function speak(text) {
+    if (!ttsOn.checked) return;
+    const clean = sanitizeForTTS(text);
+    if (!clean) return;
+    window.speechSynthesis.cancel
 ();
-    const u = new SpeechSynthesisUtterance(line);
-    u.lang='ko-KR'; u.rate=1.0; u.pitch=1.0;
-    speechSynthesis.speak(u);
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'ko-KR';
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    window.speechSynthesis.speak(u);
   }
-  ttsPause.onclick = ()=>speechSynthesis.pause();
-  ttsResume.onclick = ()=>speechSynthesis.resume();
-  ttsStop.onclick = ()=>speechSynthesis.cancel
+  ttsPause.onclick  = () => window.speechSynthesis.pause();
+  ttsResume.onclick = () => window.speechSynthesis.resume();
+  ttsStop.onclick   = () => window.speechSynthesis.cancel
 ();
 
-  // ========= STT =========
+  // ===== STT(음성 인식) =====
   let rec;
-  if('webkitSpeechRecognition' in window){
-    const R = window.webkitSpeechRecognition;
-    rec = new R();
-    rec.lang='ko-KR'; rec.continuous
-=false; rec.interimResults
-=false;
-    rec.onresult = (e)=>{
-      const txt = e.results[0][0].transcript;
-      input.value = txt;
-      form.dispatchEvent(new Event('submit',{cancelable:true}));
+  if ('webkitSpeechRecognition' in window) {
+    rec = new webkitSpeechRecognition();
+    rec.lang = 'ko-KR';
+    rec.continuous
+ = false;
+    rec.interimResults
+ = false;
+    rec.onresult = (e) => {
+      input.value = e.results[0][0].transcript;
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
     };
-    rec.onerror = ()=>alert('음성 인식 오류가 발생했습니다. 다시 시도해 주세요.');
-  }else{
+    rec.onerror = () => alert('음성 인식 오류가 발생했습니다. 다시 시도해 주세요.');
+  } else {
     micBtn.disabled = true;
-    micBtn.title = '브라우저가 음성 인식을 지원하지 않습니다.';
+    micBtn.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
   }
-  micBtn.onclick = ()=>{ try{ rec && rec.start(); }catch(_){} };
+  micBtn.onclick = () => { try { rec && rec.start(); } catch(_) {} };
 
-  // ========= AI 호출 =========
-  async function callAI(prompt){
-    if(typeof window.askAI==='function'){  // /ai.js 제공 시 우선 사용
-      return await window.askAI(prompt);
-    }
-    const res = await fetch('/api/ai',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({prompt})
-    });
-    if(!res.ok) throw new Error('AI 응답 실패');
-    const data = await res.json();
-    return data.text || data.reply || JSON.stringify(data);
-  }
-
-  // ========= 전송 처리 =========
+  // ===== 전송 처리 =====
   form.addEventListener
-('submit', async (e)=>{
+('submit', async (e) => {
     e.preventDefault();
     const q = input.value.trim();
-    if(!q) return;
-    input.value='';
+    if (!q) return;
+    input.value = '';
     pushMsg('user', q);
-    try{
-      const a = await callAI(q);
+
+    try {
+      const a = await askAI(q);   // <-- ai.js 호출
       pushMsg('bot', a);
       speak(a);
-    }catch(err){
-      const msg='에러가 발생했습니다. 곧 조치하겠습니다.';
+    } catch (err) {
+      const msg = '에러가 발생했습니다. 곧 조치하겠습니다.';
       pushMsg('bot', msg);
       speak(msg);
+      reportClientError({ type:'ai', message:String(err) }).catch(()=>{});
+      // 필요하면: await fetch('/api/alert', {method:'POST',body:JSON.stringify({...})})
     }
   });
 
-  // ========= 에러 배지 =========
-  function showErr(){ $('#errorBadge').style.display='block'; }
+  // ===== 전역 에러 뱃지 =====
+  const badge = document.getElementById('errorBadge');
+  function showBadge(){ badge.style.display='block'; }
   window.addEventListener
-('error', showErr);
+('error', () => { showBadge(); reportClientError({type:'error'}); });
   window.addEventListener
-('unhandledrejection', showErr);
+('unhandledrejection', () => { showBadge(); reportClientError({type:'unhandledrejection'}); });
 </script>
 </body>
 </html>
