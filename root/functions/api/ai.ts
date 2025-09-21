@@ -9,10 +9,8 @@ export const onRequestPost: PagesFunction<{ GEMINI_API_KEY: string }> = async ({
       generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
     };
 
-    const url =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=
-' +
-      encodeURIComponent(env.GEMINI_API_KEY);
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" +
+      ctx.env.GEMINI_API_KEY;
 
     const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) return j({ ok: false, reason: 'HTTP_' + r.status }, 502);
