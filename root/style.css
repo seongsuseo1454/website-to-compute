@@ -1,48 +1,45 @@
 :root{
-  --bg:#0b0f19; --card:#121827; --muted:#9aa4b2; --text:#e6e8eb; --accent:#4f8cff;
-  --danger:#ff4d4f; --radius:16px;
+  --bg:#0b0f19; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#3b82f6;
+  --ok:#16a34a; --danger:#ef4444; --ring:rgba(59,130,246,.35);
 }
-*{box-sizing:border-box} html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR}
-.container{max-width:560px;margin:0 auto;padding:16px}
-
-.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
-h1{font-size:26px;margin:0}
-.sub{margin:2px 0 0;color:var(--muted);font-size:14px}
-.clock{font-size:28px;color:#cbd5e1}
-
-.card{background:var(--card);border-radius:var(--radius);padding:14px;margin:12px 0;box-shadow:0 6px 18px rgba(0,0,0,.25)}
-.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
-.card-title{margin:0 0 8px 0;font-size:18px}
-.meta{color:var(--muted);font-size:12px;margin:2px 0 10px}
-
-.kv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.kv{display:flex;align-items:center;justify-content:space-between;background:#0f1524;border:1px solid #1b2336;border-radius:12px;padding:10px}
-.k{color:var(--muted);font-size:14px}
-.v{font-weight:700;font-size:18px}
-
-.chat{max-height:220px;overflow:auto;border:1px solid #1b2336;border-radius:12px;padding:12px;background:#0f1524;margin-bottom:10px}
-.chat .bot,.chat .user{padding:10px 12px;border-radius:12px;margin-bottom:8px;max-width:100%}
-.chat .bot{background:#121a30}
-.chat .user{background:#1d2a4a;align-self:flex-end}
-
-.chat-form{display:flex;gap:8px}
-.chat-form input{flex:1;min-width:0;border:1px solid #1b2336;background:#0f1524;color:var(--text);border-radius:12px;padding:10px 12px}
-.btn,.ghost,.primary,.danger{border:none;border-radius:12px;padding:10px 14px;cursor:pointer;font-weight:600}
-.primary{background:var(--accent);color:#fff}
-.ghost{background:#0f1524;color:#cbd5e1;border:1px solid #1b2336}
-.danger{background:#2b0f12;color:#ffb3b3;border:1px solid #4a1d22}
-.mic{width:44px}
-
-.tts-row{display:flex;align-items:center;gap:8px;margin-top:8px}
-.ck{display:flex;align-items:center;gap:8px}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif}
+.container{max-width:980px;margin:0 auto;padding:20px}
+.hero{display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 18px}
+.hero .sub{color:var(--muted);margin:.25rem 0 0}
+.clock{font-size:42px;font-weight:800;opacity:.9}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:16px 16px 18px;margin:16px 0;backdrop-filter: blur(6px)}
+.card-title{font-weight:800;letter-spacing:.02em;margin:0 0 12px}
+.row-right{display:flex;justify-content:flex-end;margin-top:8px}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:320px;overflow:auto;padding:8px;background:rgba(255,255,255,.02);border-radius:12px;border:1px solid rgba(255,255,255,.06)}
+.chat .bot{align-self:flex-start;background:#1f2937;border:1px solid rgba(255,255,255,.06);padding:10px 12px;border-radius:12px;max-width:88%}
+.chat .user{align-self:flex-end;background:#334155;border:1px solid rgba(255,255,255,.1);padding:10px 12px;border-radius:12px;max-width:88%}
+.chat-form{display:flex;gap:8px;margin-top:10px}
+.chat-form input{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:#0f172a;color:var(--text)}
+button{cursor:pointer;border-radius:12px;border:1px solid rgba(255,255,255,.08);padding:10px 14px;background:#1f2937;color:var(--text)}
+button.primary{background:var(--accent);border-color:var(--accent);color:white}
+button.ghost{background:transparent}
+button.danger{border-color:rgba(255,255,255,.08);color:#fecaca}
+.tTS-row,.interp-row{display:flex;align-items:center;gap:10px;margin-top:8px}
 .spacer{flex:1}
+.divider{border:0;height:1px;background:rgba(255,255,255,.06);margin:12px 0}
+.ml16{margin-left:16px}
 
-.footer{color:var(--muted);text-align:center;margin:18px 0 10px}
+.weather-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.weather-row{display:flex;justify-content:space-between;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06)}
+.weather-label{color:var(--muted)}
 
-@media (min-width:900px){
-  .container{max-width:960px}
-  .hero h1{font-size:32px}
-  .clock{font-size:34px}
-  .chat{max-height:280px}
+.fab-mic{
+  position:fixed; right:18px; bottom:88px; width:72px; height:72px; border-radius:50%;
+  background:linear-gradient(180deg,#22c55e,#16a34a); color:#fff; border:none; box-shadow:0 8px 24px rgba(22,163,74,.35);
+  font-size:28px; display:flex; align-items:center; justify-content:center; z-index:9998;
 }
+.fab-mic:active{transform:scale(.98)}
+.mic-inline{min-width:44px}
+
+@media (max-width:768px){
+  .container{padding:14px}
+  .clock{font-size:36px}
+}
+.footer{color:var(--muted);text-align:center;margin:16px 0 8px}
