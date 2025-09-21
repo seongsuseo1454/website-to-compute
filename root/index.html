@@ -14,62 +14,150 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <main class="container">
-    <!-- 상단 인사/시계 -->
-    <section class="hero">
+<main class="container">
+  <!-- 상단 인사/시계 -->
+  <section class="hero">
+    <div>
+      <h1 id="greet">시장님 안녕하세요</h1>
+      <p class="sub" id="today"></p>
+    </div>
+    <div class="clock" id="clock">--:--</div>
+  </section>
+
+  <!-- 현재 날씨 -->
+  <section class="card">
+    <header class="card-title">현재 날씨</header>
+    <div class="grid2">
       <div>
-        <h1 id="greet">시장님 안녕하세요</h1>
-        <p class="sub" id="today">2025.09.21 (일)</p>
+        <div class="muted" id="locHint">지역 확인 중…</div>
+        <div class="row"><span>온도:</span><b id="wTemp">- °C</b></div>
+        <div class="row"><span>습도:</span><b id="wHum">- %</b></div>
+        <div class="row"><span>강수:</span><b id="wRain">- mm</b></div>
+        <div class="row"><span>풍속:</span><b id="wWind">- m/s</b></div>
       </div>
-      <div class="clock" id="clock">--:--</div>
-    </section>
-
-    <!-- 날씨 카드 -->
-    <section class="card">
-      <header class="card-title row">
-        <span>현재 날씨</span>
-        <button id="btnWx" class="ghost">날씨 업데이트</button>
-      </header>
-
-      <p class="muted" id="locLabel">지역 확인 중…</p>
-
-      <div class="wx-grid">
-        <div><span class="k">온도</span><span class="v" id="wxT">- °C</span></div>
-        <div><span class="k">습도</span><span class="v" id="wxH">- %</span></div>
-        <div><span class="k">강수</span><span class="v" id="wxR">- mm</span></div>
-        <div><span class="k">풍속</span><span class="v" id="wxW">- m/s</span></div>
+      <div class="right">
+        <button id="btnWeather" class="ghost">날씨 업데이트</button>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- AI 비서 (채팅 + 음성) -->
-    <section class="card">
-      <header class="card-title">AI 비서 채팅</header>
+   <!-- ⬇️⬇️ 여기에 일정 카드 추가 -->
+  <section class="card" id="scheduleCard">
+    <header class="card-title">오늘 일정 요약</header>
+    <div class="row right"><button id="btnSched" class="ghost">새로고침</button></div>
 
-      <div id="chat" class="chat">
-        <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
+    <ul id="schedList" class="sched-list">
+      <!-- JS로 채움 -->
+    </ul>
+
+    <div class="tts-row">
+      <button id="schedSpeak" class="ghost">📢 일정 요약 읽기</button>
+    </div>
+  </section>
+  <!-- ⬆️⬆️ 일정 카드 끝 -->
+
+  <!-- 시정뉴스 -->
+<section class="card" id="newsCard">
+  <header class="card-title row">
+    <span>시정 뉴스</span>
+    <span class="muted small" id="newsUpdated"></span>
+  </header>
+
+  <ul id="newsList" class="bullet-list"></ul>
+
+  <div class="row right gap8">
+    <button id="btnNews" class="ghost">새로고침</button>
+    <button id="btnNewsSpeak" class="ghost">📢 요약 읽기</button>
+  </div>
+</section>
+
+<!-- 부서별 업무보고 -->
+<section class="card" id="reportCard">
+  <header class="card-title row">
+    <span>부서별 업무보고</span>
+    <span class="muted small" id="repUpdated"></span>
+  </header>
+
+  <ul id="repList" class="bullet-list"></ul>
+
+  <div class="row right gap8">
+    <button id="btnRep" class="ghost">새로고침</button>
+    <button id="btnRepSpeak" class="ghost">📢 요약 읽기</button>
+  </div>
+</section>
+  
+  <!-- AI 비서 (채팅 + 음성) -->
+  <section class="card">
+    <header class="card-title">AI 비서 채팅</header>
+
+    <div id="chat" class="chat">
+      <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
+    </div>
+
+    <form id="chatForm" class="chat-form">
+      <button type="button" id="micBtn" title="음성으로 말하기" class="ghost mic-lg">🎤</button>
+      <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
+      <button type="submit" class="primary">보내기</button>
+    </form>
+
+    <div class="tts-row">
+      <label><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
+      <div class="spacer"></div>
+      <button id="ttsPause" class="ghost">⏸︎ 일시정지</button>
+      <button id="ttsResume" class="ghost">▶︎ 재개</button>
+      <button id="ttsStop" class="danger ghost">■ 정지</button>
+    </div>
+
+    <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
+  </section>
+
+  <!-- 실시간 통역 -->
+  <section class="card">
+    <header class="card-title">실시간 통역</header>
+
+    <div class="lang-row">
+      <div>
+        <small>입력(말하기) 언어</small>
+        <select id="srcLang"></select>
       </div>
-
-      <form id="chatForm" class="chat-form">
-        <button type="button" id="micBtn" title="음성으로 말하기" class="mic big">🎤</button>
-        <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
-        <button type="submit" class="primary">보내기</button>
-      </form>
-
-      <div class="tts-row">
-        <label><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
-        <div class="spacer"></div>
-        <button id="ttsPause" class="ghost">⏸︎ 일시정지</button>
-        <button id="ttsResume" class="ghost">▶︎ 재개</button>
-        <button id="ttsStop" class="danger ghost">■ 정지</button>
+      <div>
+        <small>출력(읽어주기) 언어</small>
+        <select id="tgtLang"></select>
       </div>
+      <div class="right">
+        <button id="trStart" class="ghost">🎙️ 통역 시작</button>
+        <button id="trStop" class="danger ghost">■ 통역 정지</button>
+      </div>
+    </div>
 
-      <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
-    </section>
+    <div class="trans-box">
+      <div class="trans-in">
+        <div class="muted">[입력 자막]</div>
+        <div id="trIn" class="bubble"></div>
+      </div>
+      <div class="trans-out">
+        <div class="muted">[번역 결과]</div>
+        <div id="trOut" class="bubble strong"></div>
+      </div>
+    </div>
+    <p class="hint">※ API가 비활성(405 등)이어도 통역은 내장 백업(오픈 LibreTranslate)으로 동작합니다.</p>
+  </section>
 
-    <!-- 하단 -->
-    <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
-  </main>
+  <!-- 바닥 표시 -->
+  <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
+</main>
 
-  <script src="/ai.js"></script>
+<!-- 비즈니스 로직 -->
+<script src="/ai.js" type="module"></script>
+
+<!-- 경고 배지 -->
+<style>.error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}</style>
+<div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
+<script>
+  window.addEventListener
+('error', ()=>{ document.getElementById('errorBadge').style.display='block'; });
+  window.addEventListener
+('unhandledrejection', ()=>{ document.getElementById('errorBadge').style.display='block'; });
+</script>
 </body>
 </html>
