@@ -12,104 +12,205 @@
   <meta name="theme-color" content="#0b0f19" />
 
   <link rel="stylesheet" href="/style.css" />
+  <style>
+    /* 최소 보장 스타일 (기존 style.css가 있으면 그대로 적용됨) */
+    body{background:#0b0f19;color:#e6e9f0;font-family:system-ui,apple sd gothi,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif}
+    .container{max-width:980px;margin:24px auto;padding:8px}
+    .hero{display:flex;justify-content:space-between;align-items:center;background:#141927;border:1px solid #2a3345;border-radius:16px;padding:20px 24px;margin-bottom:16px}
+    .hero h1{font-size:32px;margin:0 0 6px}
+    .hero .sub{opacity:.8;margin:0}
+    .clock{font-size:40px;opacity:.9}
+    .card{background:#141927;border:1px solid #2a3345;border-radius:16px;padding:16px 18px;margin-bottom:16px}
+    .card-title{font-size:22px;margin:0 0 14px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid #39445f;background:#1a2131;padding:8px 12px;border-radius:12px}
+    .chat{display:flex;flex-direction:column;gap:10px;height:260px;overflow:auto;background:#0f1321;border:1px solid #2a3345;border-radius:12px;padding:12px}
+    .chat .user{align-self:flex-end;background:#21406b;padding:10px 12px;border-radius:12px 12px 2px 12px}
+    .chat .bot{align-self:flex-start;background:#222b43;padding:10px 12px;border-radius:12px 12px 12px 2px}
+    .chat-form{display:flex;gap:8px;margin-top:10px}
+    .chat-form input{flex:1;background:#0f1321;border:1px solid #2a3345;border-radius:10px;padding:10px;color:#e6e9f0}
+    button{cursor:pointer}
+    .primary{background:#3b82f6;border:0;color:#fff;border-radius:10px;padding:10px 14px}
+    .ghost{background:#1b2234;border:1px solid #2a3345;color:#cbd5e1;border-radius:10px;padding:10px 12px}
+    .danger{border-color:#8b2f37;color:#ffdfe1}
+    .spacer{flex:1}
+    .tts-row{display:flex;align-items:center;gap:10px;margin-top:8px}
+    .footer{opacity:.7;text-align:center;margin:20px 0}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media (min-width:800px){ .grid{grid-template-columns:1fr 1fr} }
+    .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
+  </style>
 </head>
 <body>
 <main class="container">
   <!-- 상단 인사/시계 -->
   <section class="hero">
     <div>
-      <h1 id="greet">시장님 안녕하세요</h1>
-      <p class="sub" id="today"></p>
+      <h1 id="greet">활기찬 하루입니다, 시장님</h1>
+      <p class="sub" id="today">YYYY.MM.DD (요일)</p>
     </div>
     <div class="clock" id="clock">--:--</div>
   </section>
 
-  <!-- 현재 날씨 -->
-  <section class="card">
-    <header class="card-title">현재 날씨</header>
-    <div class="weather-grid">
-      <div class="weather-row">
-        <div class="weather-label">온도</div><div id="t1">-℃</div>
+  <!-- 날씨/일정 + AI 비서 -->
+  <section class="grid">
+    <!-- 현재 날씨 -->
+    <div class="card">
+      <header class="card-title">현재 날씨</header>
+      <div class="row" style="margin-bottom:10px">
+        <span class="pill">온도: <b id="wxTemp">-</b> °C</span>
+        <span class="pill">습도: <b id="wxHum">-</b> %</span>
+        <span class="pill">풍속: <b id="wxWind">-</b> m/s</span>
+        <span class="pill">강수: <b id="wxRain">-</b></span>
       </div>
-      <div class="weather-row">
-        <div class="weather-label">습도</div><div id="h1">-%</div>
-      </div>
-      <div class="weather-row">
-        <div class="weather-label">강수</div><div id="r1">-</div>
-      </div>
-      <div class="weather-row">
-        <div class="weather-label">풍속</div><div id="w1">- m/s</div>
-      </div>
-    </div>
-    <div class="row-right">
-      <button id="btnWeather" class="ghost">날씨 업데이트</button>
-    </div>
-  </section>
-
-  <!-- AI 비서 (채팅 + 음성 + 통역) -->
-  <section class="card">
-    <header class="card-title">AI 비서 채팅</header>
-
-    <div id="chat" class="chat">
-      <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
+      <button id="wxBtn" class="ghost">날씨 업데이트</button>
+      <small id="wxInfo" style="display:block;margin-top:8px;opacity:.8">위치 허용 후 업데이트를 눌러주세요.</small>
     </div>
 
-    <form id="chatForm" class="chat-form" autocomplete="off">
-      <button type="button" id="micBtn" title="음성으로 말하기" class="ghost mic-inline">🎤</button>
-      <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" />
-      <button type="submit" class="primary">보내기</button>
-    </form>
-
-    <div class="tts-row">
-      <label><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
-      <div class="spacer"></div>
-      <button id="ttsPause" class="ghost">⏸︎ 일시정지</button>
-      <button id="ttsResume" class="ghost">▶︎ 재개</button>
-      <button id="ttsStop" class="danger ghost">■ 정지</button>
-    </div>
-
-    <hr class="divider" />
-
-    <div class="interp-row">
-      <div class="interp-left">
-        <label><input type="checkbox" id="alwaysOn" /> 항상 듣기(자동 재시작)</label>
-        <label class="ml16"><input type="checkbox" id="interpToggle" /> 통역 모드</label>
+    <!-- AI 비서 (채팅 + 음성) -->
+    <div class="card">
+      <header class="card-title">AI 비서 채팅</header>
+      <div id="chat" class="chat">
+        <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
       </div>
-      <div class="interp-right">
-        <select id="interpMode" title="통역 방향">
-          <option value="ko-en">한국어 ↔ 영어</option>
-          <option value="ko-ja">한국어 ↔ 일본어</option>
-          <option value="ko-zh">한국어 ↔ 중국어(간체)</option>
-        </select>
+      <form id="chatForm" class="chat-form" autocomplete="off">
+        <button type="button" id="micBtn" title="음성으로 말하기" class="ghost">🎤</button>
+        <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" />
+        <button type="submit" class="primary">보내기</button>
+      </form>
+      <div class="tts-row">
+        <label><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
+        <div class="spacer"></div>
+        <button id="ttsPause" class="ghost">⏸︎ 일시정지</button>
+        <button id="ttsResume" class="ghost">▶︎ 재개</button>
+        <button id="ttsStop" class="danger ghost">■ 정지</button>
       </div>
+      <p class="hint" style="opacity:.75;margin-top:8px">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
     </div>
-    <p class="hint">※ 특수문자/이모지/마크다운 등은 음성 읽기 전에 자동 정리됩니다.</p>
   </section>
 
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
 
-<!-- 커다란 원형 마이크(모바일/터치용) -->
-<button id="fabMic" class="fab-mic" title="말하려면 누르세요">🎙️</button>
+<!-- 오류 배지 -->
+<div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
 
-<!-- 스크립트 -->
+<!-- 전역 유틸 -->
 <script src="/ai.js"></script>
 
-<!-- 에러 뱃지 -->
-<style>.error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}</style>
-<div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
 <script>
-  window.addEventListener
-('error', ()=>{ document.getElementById('errorBadge').style.display='block'; });
-  window.addEventListener
-('unhandledrejection', ()=>{ document.getElementById('errorBadge').style.display='block'; });
-</script>  
-<script type="module">
-  import { sanitizeForTTS } from './ai.js';
+  // ===== 공통 DOM =====
+  const $ = (s) => document.querySelector(s);
+  const chat = $('#chat');
+  const input = $('#msgInput');
+  const form = $('#chatForm');
+  const micBtn = $('#micBtn');
+  const ttsToggle = $('#ttsToggle');
+  $('#ttsPause').onclick = () => AI.ttsPause();
+  $('#ttsResume').onclick = () => AI.ttsResume();
+  $('#ttsStop').onclick = () => AI.ttsStop();
 
-  // 예시: TTS 호출 전에
-  const clean = sanitizeForTTS("안녕하세요 ###!!!");
-  console.log(clean);
+  // 인사/시계
+  function tick(){
+    const now = new Date();
+    $('#clock').textContent = now.toLocaleTimeString
+('ko-KR', { hour:'2-digit', minute:'2-digit' });
+    $('#today').textContent = now.toLocaleDateString
+('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', weekday:'long' });
+  }
+  setInterval(tick, 1000); tick();
+
+  // 채팅 말풍선
+  function pushMsg(role, text){
+    const div = document.createElement('div');
+    div.className = role === 'user' ? 'user' : 'bot';
+    div.textContent = text;
+    chat.appendChild
+(div);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // 음성 인식
+  if (!AI.sttSupported) {
+    micBtn.disabled = true;
+    micBtn.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
+  }
+  micBtn.onclick = () => {
+    AI.startRecognition((txt)=>{
+      input.value = txt || '';
+      form.dispatchEvent(new Event('submit', {cancelable:true}));
+    }, (err)=>alert(err));
+  };
+
+  // AI 호출 (functions/api 또는 백엔드가 동일 경로일 때)
+  async function callAI(prompt){
+    // /api/ai 가 없는 경우를 대비해 2단계 폴백
+    try {
+      const data = await AI.safeFetchJSON('/api/ai', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ prompt })
+      });
+      return data.text || data.reply || JSON.stringify(data);
+    } catch {
+      // 폴백: 간단 응답
+      return `메모해둘게요: ${prompt}`;
+    }
+  }
+
+  // 전송 처리
+  form.addEventListener
+('submit', async (e)=>{
+    e.preventDefault();
+    const q = input.value.trim();
+    if (!q) return;
+    input.value = '';
+    pushMsg('user', q);
+    try {
+      const a = await callAI(q);
+      pushMsg('bot', a);
+      if (ttsToggle.checked) AI.speak(a);
+    } catch {
+      const msg = '에러가 발생했습니다. 곧 조치하겠습니다.';
+      pushMsg('bot', msg);
+      if (ttsToggle.checked) AI.speak(msg);
+    }
+  });
+
+  // 날씨
+  async function updateWeather(){
+    $('#wxInfo').textContent = '위치 확인 중...';
+    if (!('geolocation' in navigator)) {
+      $('#wxInfo').textContent = '이 기기에서 위치 권한을 사용할 수 없습니다.';
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+      const { latitude:lat, longitude:lon } = pos.coords
+;
+      try {
+        // 여러분의 백엔드(Cloudflare Functions 등)에서 이 경로로 응답하도록 준비됨
+        const data = await AI.safeFetchJSON(`/api/weather?lat=${lat}&lon=${lon}`);
+        $('#wxTemp').textContent = data.temp ?? '-';
+        $('#wxHum').textContent = data.humidity ?? '-';
+        $('#wxWind').textContent = data.wind ?? '-';
+        $('#wxRain').textContent = data.rain ?? '-';
+        $('#wxInfo').textContent = data.station ? `${data.station} 기준` : '업데이트 완료';
+      } catch {
+        $('#wxInfo').textContent = '날씨 정보를 불러오지 못했습니다.';
+      }
+    }, ()=>{
+      $('#wxInfo').textContent = '위치 권한이 거부되어 날씨를 불러올 수 없습니다.';
+    }, { enableHighAccuracy:false, timeout:8000 });
+  }
+  $('#wxBtn').onclick = updateWeather;
+
+  // 런타임 오류 배지
+  const showErr = ()=>{ document.getElementById('errorBadge').style.display='block'; };
+  window.addEventListener
+('error', showErr);
+  window.addEventListener
+('unhandledrejection', showErr);
 </script>
+<script src="/ai.js"></script>
 </body>
 </html>
