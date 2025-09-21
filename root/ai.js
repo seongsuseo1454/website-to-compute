@@ -1,59 +1,107 @@
-// ai.js  (루트에 두세요)
+// ai.js  (type="module")
+/* ===== 셀렉터 ===== */
+const $ = (s) => document.querySelector(s);
+const chat   = $('#chat');
+const input  = $('#msgInput');
+const form   = $('#chatForm');
+const micBtn = $('#micBtn');
 
-/**
- * 음성 합성 전에 특수문자/이모지/마크다운/URL 등을 정리
- */
-export function sanitizeForTTS(input) {
+const ttsToggle = $('#ttsToggle');
+const ttsPause  = $('#ttsPause');
+const ttsResume = $('#ttsResume');
+const ttsStop   = $('#ttsStop');
+
+/* ===== 채팅 UI ===== */
+function pushMsg(role, text){
+  const div = document.createElement('div');
+  div.className = role === 'user' ? 'user' : 'bot';
+  div.textContent = text;
+  chat.appendChild
+(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+/* ===== TTS 정리 ===== */
+export function sanitizeForTTS(input){
   let s = String(input ?? '');
   // URL 제거
-  s = s.replace(/https?:\/\/\S+/g, '');
-  // 마크다운/특수문자 정리
-  s = s.replace(/[\*\_\`\~\^\#\>\<\|\:\\\/\[\]\{\}\-]+/g, ' ');
-  // 이모지 제거 (Unicode property 사용 가능한 브라우저)
-  try { s = s.replace(/\p{Extended_Pictographic}/gu, ''); } catch (e) {}
+  s = s.replace(/https?:\/\/\S+/g, ' ');
+  // 마크다운/특수 문자 제거
+  s = s.replace(/[\*\_\`\~\^\#\<\>\|\:\\\/\[\]\{\}\-\+\=\(\)]+/g, ' ');
+  // 이모지 제거 (지원 브라우저만)
+  try { s = s.replace(/\p{Extended_Pictographic}/gu, ' '); } catch {}
   // 제어문자 제거
-  s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+  s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
   // 공백 정리
   return s.replace(/\s{2,}/g, ' ').trim();
 }
 
-/**
- * 서버의 AI 라우트에 질의 (Cloudflare Pages/Workers: /api/ai)
- * 서버는 환경변수(GEMINI_API_KEY 등)로 외부 모델 호출
- */
-export async function askAI(prompt) {
+/* ===== TTS ===== */
+function speak(text){
+  if(!ttsToggle.checked) return;
+  const line = sanitizeForTTS(text);
+  if(!line) return;
+  speechSynthesis.cancel
+();
+  const u = new SpeechSynthesisUtterance(line);
+  u.lang = 'ko-KR'; u.rate=1.0; u.pitch=1.0;
+  speechSynthesis.speak(u);
+}
+ttsPause.onclick  = ()=> speechSynthesis.pause();
+ttsResume.onclick = ()=> speechSynthesis.resume();
+ttsStop.onclick   = ()=> speechSynthesis.cancel
+();
+
+/* ===== STT (webkitSpeechRecognition) ===== */
+let rec;
+if('webkitSpeechRecognition' in window){
+  const R = window.webkitSpeechRecognition;
+  rec = new R();
+  rec.lang='ko-KR'; rec.continuous
+=false; rec.interimResults
+=false;
+  rec.onresult = (e)=>{
+    const txt = e.results[0][0].transcript;
+    input.value = txt;
+    form.dispatchEvent(new Event('submit',{cancelable:true}));
+  };
+  rec.onerror = ()=> alert('음성 인식 오류입니다. 다시 시도해 주세요.');
+}else{
+  micBtn.disabled = true;
+  micBtn.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
+}
+micBtn.onclick = ()=> { try{ rec && rec.start(); }catch{} };
+
+/* ===== AI 호출 ===== */
+async function callAI(prompt){
+  // Cloudflare Pages Functions: /api/ai (env.GEMINI_API_KEY 사용)
   const res = await fetch('/api/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ prompt })
   });
-  if (!res.ok) {
-    const text = await res.text().catch(()=> '');
-    throw new Error('AI 호출 실패: ' + res.status + ' ' + text);
-  }
-  const data = await res.json().catch(()=> ({}));
-  return data.text || data.reply || data.result || JSON.stringify(data);
+  if(!res.ok) throw new Error('AI_HTTP_'+res.status);
+  const data = await res.json();
+  return data.text || data.reply || JSON.stringify(data);
 }
 
-/**
- * 클라이언트 에러 리포트 (옵션)
- * 서버에 /api/report 구현되어 있으면 자동 수집
- */
-export async function reportClientError(payload = {}) {
-  try {
-    await fetch('/api/report', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        ...payload,
-        ua: navigator.userAgent
-,
-        url: location.href,
-        at: new Date().toISOString()
-      }),
-      keepalive: true
-    });
-  } catch {
-    // 리포트 실패는 무시
+/* ===== 전송 처리 ===== */
+form.addEventListener
+('submit', async (e)=>{
+  e.preventDefault();
+  const q = input.value.trim();
+  if(!q) return;
+  input.value='';
+  pushMsg('user', q);
+  try{
+    const a = await callAI(q);
+    pushMsg('bot', a);
+    speak(a);
+  }catch(err){
+    const msg = '에러가 발생했습니다. 곧 조치하겠습니다.';
+    pushMsg('bot', msg);
+    speak(msg);
+    // 필요 시 원격 리포트 훅 연결
+    // fetch('/api/report', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'AI_FAIL',detail:String(err)})})
   }
-}
+});
