@@ -85,6 +85,50 @@
     </div>
   </section>
 
+  <!-- 실시간 통역 (14개 언어) -->
+  <section class="card">
+    <header class="card-title">실시간 통역</header>
+
+    <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap">
+      <label>입력(말하기)
+        <select id="trSrc">
+          <option value="ko">한국어</option><option value="en">English</option>
+          <option value="ja">日本語</option><option value="zh">中文</option>
+          <option value="fr">Français</option><option value="de">Deutsch</option>
+          <option value="es">Español</option><option value="pt">Português</option>
+          <option value="ru">Русский</option><option value="vi">Tiếng Việt</option>
+          <option value="th">ไทย</option><option value="id">Bahasa Indonesia</option>
+          <option value="ar">العربية</option><option value="hi">हिन्दी</option>
+        </select>
+      </label>
+
+      <label>출력(읽어주기)
+        <select id="trDst">
+          <option value="en">English</option><option value="ko">한국어</option>
+          <option value="ja">日本語</option><option value="zh">中文</option>
+          <option value="fr">Français</option><option value="de">Deutsch</option>
+          <option value="es">Español</option><option value="pt">Português</option>
+          <option value="ru">Русский</option><option value="vi">Tiếng Việt</option>
+          <option value="th">ไทย</option><option value="id">Bahasa Indonesia</option>
+          <option value="ar">العربية</option><option value="hi">हिन्दी</option>
+        </select>
+      </label>
+
+      <button id="trStart" class="btn-xl primary" title="말하기 시작">🎤 크게 말하기</button>
+      <button id="trStop"  class="ghost danger" disabled>■ 통역 정지</button>
+    </div>
+
+    <div class="row" style="gap:12px; margin-top:12px">
+      <textarea id="trIn"  class="mono" placeholder="입력 인식 텍스트…" rows="2" style="flex:1"></textarea>
+      <textarea id="trOut" class="mono" placeholder="번역 결과…" rows="2" style="flex:1"></textarea>
+    </div>
+
+    <div class="row" style="gap:8px; margin-top:8px">
+      <button id="trTranslate" class="ghost">텍스트 번역</button>
+      <button id="trSpeak" class="ghost">▶︎ 번역 읽어주기</button>
+    </div>
+  </section>
+
   <!-- 바닥 표시 -->
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
@@ -95,9 +139,22 @@
 </style>
 <div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
 
-<!-- 스크립트 -->
+<!-- 비서 로직(선행 제공된 /ai.js 사용). 없으면 안전 폴백 -->
 <script src="/ai.js"></script>
+
 <script>
+/* ===== 폴백: TTS 안전 정리(sanitizeForTTS) – /ai.js에 없으면 이 버전 사용 ===== */
+if (!window.sanitizeForTTS) {
+  window.sanitizeForTTS = function (input) {
+    let s = String(input ?? '');
+    s = s.replace(/https?:\/\/\S+/g, '');                          // URL 제거
+    s = s.replace(/[\*\_\`\~\^\#\>\<\|\:\\\/\[\]\{\}\-]+/g, ' ');  // 마크다운/기호
+    try { s = s.replace(/\p{Extended_Pictographic}/gu, ''); } catch (e) {}
+    s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');            // 제어문자
+    return s.replace(/\s{2,}/g, ' ').trim();
+  };
+}
+
 /* ===== 공통 ===== */
 const $ = (s)=>document.querySelector(s);
 const chat = $('#chat'), input=$('#msgInput'), form=$('#chatForm');
@@ -107,10 +164,8 @@ const ttsPause=$('#ttsPause'), ttsResume=$('#ttsResume'), ttsStop=$('#ttsStop');
 // 시계/날짜/인사
 function tick(){
   const now=new Date();
-  $('#clock').textContent = now.toLocaleTimeString
-('ko-KR',{hour:'2-digit',minute:'2-digit'});
-  $('#today').textContent = now.toLocaleDateString
-('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'});
+  $('#clock').textContent = now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  $('#today').textContent = now.toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'});
   const h=now.getHours();
   $('#greet').textContent = (h<12?'좋은 아침입니다':'활기찬 하루입니다') + ', 시장님';
 }
@@ -121,8 +176,7 @@ function pushMsg(role, text){
   const div=document.createElement('div');
   div.className = role==='user'?'user':'bot';
   div.textContent = text;
-  chat.appendChild
-(div);
+  chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 }
 
@@ -131,24 +185,20 @@ function speak(text){
   if(!ttsToggle.checked) return;
   const line = window.sanitizeForTTS ? window.sanitizeForTTS(text): text;
   if(!line) return;
-  window.speechSynthesis.cancel
-();
+  window.speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(line);
   u.lang='ko-KR'; u.rate=1.0; u.pitch=1.0;
   window.speechSynthesis.speak(u);
 }
 ttsPause.onclick=()=>window.speechSynthesis.pause();
 ttsResume.onclick=()=>window.speechSynthesis.resume();
-ttsStop.onclick=()=>window.speechSynthesis.cancel
-();
+ttsStop.onclick=()=>window.speechSynthesis.cancel();
 
-/* ===== STT ===== */
+/* ===== STT (채팅용) ===== */
 let rec;
 if('webkitSpeechRecognition' in window){
   const R=window.webkitSpeechRecognition; rec=new R();
-  rec.lang='ko-KR'; rec.continuous
-=false; rec.interimResults
-=false;
+  rec.lang='ko-KR'; rec.continuous=false; rec.interimResults=false;
   rec.onresult=(e)=>{ const txt=e.results[0][0].transcript; input.value=txt;
     form.dispatchEvent(new Event('submit',{cancelable:true})); };
   rec.onerror=()=>alert('음성 인식 오류. 다시 시도해 주세요.');
@@ -167,8 +217,7 @@ async function callAI(prompt){
 }
 
 /* ===== 전송 처리 ===== */
-form.addEventListener
-('submit', async (e)=>{
+form.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const q=input.value.trim(); if(!q) return;
   input.value=''; pushMsg('user',q);
@@ -177,26 +226,69 @@ form.addEventListener
     pushMsg('bot', a); speak(a);
   }catch(err){
     const msg='에러가 발생했습니다. 곧 조치하겠습니다.'; pushMsg('bot', msg); speak(msg);
-    // 원격 보고(무음 실패 허용)
     fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'AI_FAIL',detail:String(err)})}).catch(()=>{});
   }
 });
 
-/* ===== 날씨 ===== */
+/* ===== 날씨: 모바일 위치 → KMA 격자(nx,ny) 변환 후 호출 ===== */
+function latlonToGrid(lat, lon) {
+  // KMA LCC(기상청) 좌표계 변환 (nx, ny)
+  const RE=6371.00877, GRID=5.0, SLAT1=30.0, SLAT2=60.0, OLON=126.0, OLAT=38.0, XO=43, YO=136;
+  const DEGRAD=Math.PI/180.0;
+  const re=RE/GRID;
+  const slat1=SLAT1*DEGRAD, slat2=SLAT2*DEGRAD, olon=OLON*DEGRAD, olat=OLAT*DEGRAD;
+  let sn=Math.tan(Math.PI*0.25+slat2*0.5)/Math.tan(Math.PI*0.25+slat1*0.5);
+  sn=Math.log(Math.cos(slat1)/Math.cos(slat2))/Math.log(sn);
+  let sf=Math.tan(Math.PI*0.25+slat1*0.5);
+  sf=Math.pow(sf,sn)*Math.cos(slat1)/sn;
+  let ro=Math.tan(Math.PI*0.25+olat*0.5);
+  ro=re*sf/Math.pow(ro,sn);
+  let ra=Math.tan(Math.PI*0.25+(lat)*DEGRAD*0.5);
+  ra=re*sf/Math.pow(ra,sn);
+  let theta=lon*DEGRAD-olon;
+  if(theta>Math.PI) theta-=2.0*Math.PI;
+  if(theta<-Math.PI) theta+=2.0*Math.PI;
+  theta*=sn;
+  const nx=Math.floor(ra*Math.sin(theta)+XO+0.5);
+  const ny=Math.floor(ro-ra*Math.cos(theta)+YO+0.5);
+  return {nx, ny};
+}
+
 async function loadWeather(){
   try{
-    // 기본 좌표(서울) – 모바일 위치권한 없을 때 대비
-    const nx=60, ny=127;
-    const res = await fetch(`/api/weather?nx=${nx}&ny=${ny}`);
-    const data = await res.json();
-    const txt = data?.summary || '날씨 정보를 불러올 수 없습니다.';
-    $('#weatherBox').textContent = txt;
+    const setText = (t)=>($('#weatherBox').textContent=t);
+    // 위치 권한 시도
+    if (navigator.geolocation) {
+      await new Promise((resolve)=> {
+        navigator.geolocation.getCurrentPosition(async (pos)=>{
+          const {latitude, longitude}=pos.coords;
+          const {nx, ny}=latlonToGrid(latitude, longitude);
+          const res = await fetch(`/api/weather?nx=${nx}&ny=${ny}`).catch(()=>null);
+          if (res && res.ok) {
+            const data = await res.json();
+            setText(data?.summary || '현재 위치 기준 날씨를 불러올 수 없습니다.');
+          } else setText('날씨 API 응답이 없습니다.');
+          resolve();
+        }, async ()=>{
+          // 거부/실패 시 서울 기본 좌표
+          const res = await fetch(`/api/weather?nx=60&ny=127`).catch(()=>null);
+          if (res && res.ok) {
+            const data = await res.json();
+            setText(data?.summary || '날씨 정보를 불러올 수 없습니다.');
+          } else setText('날씨 정보를 불러올 수 없습니다.');
+          resolve();
+        }, {enableHighAccuracy:false, timeout:4000});
+      });
+    } else {
+      const res = await fetch(`/api/weather?nx=60&ny=127`);
+      const data = await res.json();
+      $('#weatherBox').textContent = data?.summary || '날씨 정보를 불러올 수 없습니다.';
+    }
   }catch{ $('#weatherBox').textContent='날씨 정보를 불러올 수 없습니다.'; }
 }
 loadWeather();
 
 /* ===== 일정/뉴스/보고 ===== */
-// 서버 저장 데이터 로드
 async function loadKV(listId, key){
   try{
     const res = await fetch(`/api/admin?list=${encodeURIComponent(key)}`);
@@ -204,7 +296,6 @@ async function loadKV(listId, key){
     const items = await res.json(); renderList(listId, items);
   }catch{ renderList(listId, []); }
 }
-
 function renderList(id, items){
   const el=$(id); el.innerHTML='';
   if(!items || !items.length){
@@ -218,59 +309,101 @@ function renderList(id, items){
     el.appendChild(li);
   }
 }
-
 loadKV('#schedList','SCHEDULE:TODAY');
 loadKV('#newsList','NEWS');
 loadKV('#deptList','DEPT');
 
 /* ===== 에러배지 & 최소 리포트 ===== */
-window.addEventListener
-('error',()=>{$('#errorBadge').style.display='block';});
-window.addEventListener
-('unhandledrejection',()=>{$('#errorBadge').style.display='block';});
+window.addEventListener('error',()=>{$('#errorBadge').style.display='block';});
+window.addEventListener('unhandledrejection',()=>{$('#errorBadge').style.display='block';});
+
+/* ===== 실시간 통역(14개) – STT→번역→TTS ===== */
+const trMap = {
+  ko:'ko-KR', en:'en-US', ja:'ja-JP', zh:'zh-CN',
+  fr:'fr-FR', de:'de-DE', es:'es-ES', pt:'pt-PT',
+  ru:'ru-RU', vi:'vi-VN', th:'th-TH', id:'id-ID',
+  ar:'ar-SA', hi:'hi-IN'
+};
+const trNames = {
+  ko:'Korean', en:'English', ja:'Japanese', zh:'Chinese',
+  fr:'French', de:'German', es:'Spanish', pt:'Portuguese',
+  ru:'Russian', vi:'Vietnamese', th:'Thai', id:'Indonesian',
+  ar:'Arabic', hi:'Hindi'
+};
+
+const trSrc = $('#trSrc'), trDst = $('#trDst');
+const trStart = $('#trStart'), trStop = $('#trStop');
+const trIn = $('#trIn'), trOut = $('#trOut');
+const trTranslate = $('#trTranslate'), trSpeak = $('#trSpeak');
+
+let trRec;
+if ('webkitSpeechRecognition' in window) {
+  const R = window.webkitSpeechRecognition;
+  trRec = new R();
+  trRec.continuous = true;
+  trRec.interimResults = true;
+  trRec.onresult = (e)=>{
+    let final=''; let interim='';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t + ' ';
+      else interim += t;
+    }
+    trIn.value = (final + interim).trim();
+  };
+  trRec.onerror = ()=> alert('통역 음성 인식 오류. 다시 시도해 주세요.');
+}
+
+trStart.onclick = ()=>{
+  if (!trRec) { alert('이 브라우저는 음성 인식을 지원하지 않습니다.'); return; }
+  try {
+    const lang = trMap[trSrc.value] || 'ko-KR';
+    trRec.lang = lang;
+    trRec.start();
+    trStart.disabled = true; trStop.disabled = false;
+  } catch {}
+};
+trStop.onclick = ()=>{
+  try { trRec && trRec.stop(); } catch {}
+  trStart.disabled = false; trStop.disabled = true;
+};
+
+async function translateText(text, src, dst) {
+  if (!text?.trim()) return '';
+  // 1) 전용 번역 API가 있으면 사용 (/api/translate)
+  try {
+    const r = await fetch('/api/translate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text, src, dst })
+    });
+    if (r.ok) return (await r.json())?.text || '';
+  } catch {}
+  // 2) 폴백: /api/ai 로 번역 프롬프트
+  const prompt = `Translate the following text from ${trNames[src]||src} to ${trNames[dst]||dst}. Only the translation.\n\n"${text}"`;
+  try {
+    const ans = await callAI(prompt);
+    return (ans||'').trim();
+  } catch {
+    return '';
+  }
+}
+
+trTranslate.onclick = async ()=>{
+  const src = trSrc.value, dst = trDst.value;
+  trOut.value = '번역 중…';
+  const out = await translateText(trIn.value, src, dst);
+  trOut.value = out || '번역 결과가 없습니다.';
+};
+
+trSpeak.onclick = ()=>{
+  const line = window.sanitizeForTTS(trOut.value);
+  if (!line) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(line);
+  // 대상 언어 보이스 선택(가능한 경우)
+  u.lang = trMap[trDst.value] || 'en-US';
+  window.speechSynthesis.speak(u);
+};
 </script>
-  <!-- ===== 실시간 통역 (14개 언어) ===== -->
-<section class="card">
-  <header class="card-title">실시간 통역</header>
-
-  <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap">
-    <label>입력(말하기)
-      <select id="trSrc">
-        <option value="ko">한국어</option><option value="en">English</option>
-        <option value="ja">日本語</option><option value="zh">中文</option>
-        <option value="fr">Français</option><option value="de">Deutsch</option>
-        <option value="es">Español</option><option value="pt">Português</option>
-        <option value="ru">Русский</option><option value="vi">Tiếng Việt</option>
-        <option value="th">ไทย</option><option value="id">Bahasa Indonesia</option>
-        <option value="ar">العربية</option><option value="hi">हिन्दी</option>
-      </select>
-    </label>
-
-    <label>출력(읽어주기)
-      <select id="trDst">
-        <option value="en">English</option><option value="ko">한국어</option>
-        <option value="ja">日本語</option><option value="zh">中文</option>
-        <option value="fr">Français</option><option value="de">Deutsch</option>
-        <option value="es">Español</option><option value="pt">Português</option>
-        <option value="ru">Русский</option><option value="vi">Tiếng Việt</option>
-        <option value="th">ไทย</option><option value="id">Bahasa Indonesia</option>
-        <option value="ar">العربية</option><option value="hi">हिन्दी</option>
-      </select>
-    </label>
-
-    <button id="trStart" class="btn-xl primary" title="말하기 시작">🎤 크게 말하기</button>
-    <button id="trStop"  class="ghost danger" disabled>■ 통역 정지</button>
-  </div>
-
-  <div class="row" style="gap:12px; margin-top:12px">
-    <textarea id="trIn"  class="mono" placeholder="입력 인식 텍스트…" rows="2" style="flex:1"></textarea>
-    <textarea id="trOut" class="mono" placeholder="번역 결과…" rows="2" style="flex:1"></textarea>
-  </div>
-
-  <div class="row" style="gap:8px; margin-top:8px">
-    <button id="trTranslate" class="ghost">텍스트 번역</button>
-    <button id="trSpeak" class="ghost">▶︎ 번역 읽어주기</button>
-  </div>
-</section>
 </body>
 </html>
