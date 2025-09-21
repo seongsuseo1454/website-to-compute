@@ -19,24 +19,25 @@
     <section class="hero">
       <div>
         <h1 id="greet">시장님 안녕하세요</h1>
-        <p class="sub" id="today">YYYY.MM.DD (요일)</p>
+        <p class="sub" id="today">2025.09.21 (일)</p>
       </div>
       <div class="clock" id="clock">--:--</div>
-      <span class="badge">루미나 스마트 비서</span>
     </section>
 
-    <!-- 현재 날씨 -->
+    <!-- 날씨 카드 -->
     <section class="card">
-      <header class="card-title">현재 날씨</header>
-      <div id="wxStatus" class="muted">지역 확인 중…</div>
-      <div class="grid2">
-        <div>온도: <strong id="t">-</strong> °C</div>
-        <div>습도: <strong id="h">-</strong> %</div>
-        <div>강수: <strong id="r">-</strong> mm</div>
-        <div>풍속: <strong id="w">-</strong> m/s</div>
-      </div>
-      <div class="btn-row">
+      <header class="card-title row">
+        <span>현재 날씨</span>
         <button id="btnWx" class="ghost">날씨 업데이트</button>
+      </header>
+
+      <p class="muted" id="locLabel">지역 확인 중…</p>
+
+      <div class="wx-grid">
+        <div><span class="k">온도</span><span class="v" id="wxT">- °C</span></div>
+        <div><span class="k">습도</span><span class="v" id="wxH">- %</span></div>
+        <div><span class="k">강수</span><span class="v" id="wxR">- mm</span></div>
+        <div><span class="k">풍속</span><span class="v" id="wxW">- m/s</span></div>
       </div>
     </section>
 
@@ -49,7 +50,7 @@
       </div>
 
       <form id="chatForm" class="chat-form">
-        <button type="button" id="micBtn" title="음성으로 말하기" class="mic">🎤</button>
+        <button type="button" id="micBtn" title="음성으로 말하기" class="mic big">🎤</button>
         <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
         <button type="submit" class="primary">보내기</button>
       </form>
@@ -65,30 +66,10 @@
       <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
     </section>
 
-    <!-- 오늘 일정(데모 값) -->
-    <section class="card">
-      <header class="card-title">오늘 일정 요약</header>
-      <ul class="list">
-        <li><b>10:00</b> 간부 회의 — 본관 3층 상황실</li>
-        <li><b>14:00</b> 지역 기업 대표 면담 — 시장 집무실</li>
-        <li><b>17:00</b> 청소년 진로 간담회 — 시립도서관</li>
-      </ul>
-    </section>
-
+    <!-- 하단 -->
     <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
   </main>
 
-  <!-- 비서/날씨 로직 -->
   <script src="/ai.js"></script>
-
-  <!-- 작게: 현장 에러 뱃지 -->
-  <style>
-    .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
-  </style>
-  <div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
-  <script>
-    addEventListener('error', ()=>{ document.getElementById('errorBadge').style.display='block'; });
-    addEventListener('unhandledrejection', ()=>{ document.getElementById('errorBadge').style.display='block'; });
-  </script>
 </body>
 </html>
