@@ -59,6 +59,12 @@
     <div class="clock" id="clock">--:--</div>
   </section>
 
+  <div class="weather-line">
+  <span>기온: <strong id="temp">-℃</strong></span> ·
+  <span>하늘: <strong id="sky">-</strong></span> ·
+  <span>강수: <strong id="pty">-</strong></span>
+</div>
+  
   <div class="row">
     <!-- AI 비서 (채팅 + 음성) -->
     <section class="card col">
@@ -122,6 +128,49 @@
     <div id="interpret-grid" class="grid" style="margin-top:10px"></div>
   </section>
 
+ <div class="interpreter">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <label>입력언어
+      <select id="srcLang">
+        <option value="ko-KR">한국어</option>
+        <option value="en-US">English</option>
+        <option value="ja-JP">日本語</option>
+        <option value="zh-CN">中文(简体)</option>
+        <option value="zh-TW">中文(繁體)</option>
+        <option value="fr-FR">Français</option>
+        <option value="de-DE">Deutsch</option>
+        <option value="es-ES">Español</option>
+        <option value="pt-PT">Português</option>
+        <option value="it-IT">Italiano</option>
+        <option value="ru-RU">Русский</option>
+        <option value="vi-VN">Tiếng Việt</option>
+        <option value="th-TH">ไทย</option>
+        <option value="id-ID">Bahasa Indonesia</option>
+      </select>
+    </label>
+    <label>출력언어
+      <select id="tgtLang">
+        <option value="ko">한국어</option>
+        <option value="en">English</option>
+        <option value="ja">日本語</option>
+        <option value="zh">中文</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="pt">Português</option>
+        <option value="it">Italiano</option>
+        <option value="ru">Русский</option>
+        <option value="vi">Tiếng Việt</option>
+        <option value="th">ไทย</option>
+        <option value="id">Bahasa Indonesia</option>
+      </select>
+    </label>
+    <button id="interpretingStart" class="primary">통역 시작</button>
+    <button id="interpretingStop"  class="ghost">정지</button>
+  </div>
+  <small>※ 말하면 STT → Gemini 번역 → 목표언어로 TTS(동시통역)</small>
+</div>
+  
   <!-- 바닥 표시 -->
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
@@ -203,6 +252,114 @@ function ptyText(v) {
 refreshWeather();
 setInterval(refreshWeather, 10 * 60 * 1000);
 </script>  
-<script type="module" src="/ai.js">  
+<script>
+// ====== 유틸: 특수문자 정리(TTS 전) ======
+function sanitizeForTTS(input) {
+  let s = String(input ?? '');
+  s = s.replace(/https?:\/\/\S+/g, ' ');
+  s = s.replace(/[\*\_\`\~\^\#\>\<\|\:\\\/\[\]\{\}\-]+/g, ' ');
+  try { s = s.replace(/\p{Extended_Pictographic}/gu, ''); } catch {}
+  s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+  return s.replace(/\s{2,}/g, ' ').trim();
+}
+function speak(text, lang) {
+  const on = document.getElementById('ttsToggle');
+  if (on && !on.checked) return;
+  const msg = new SpeechSynthesisUtterance(sanitizeForTTS(text));
+  msg.lang = lang || 'ko-KR';
+  window.speechSynthesis.cancel
+();
+  window.speechSynthesis.speak(msg);
+}
+
+// ====== 날씨 표시 ======
+function skyText(v){ if(v==1) return '맑음'; if(v==3) return '구름 많음'; if(v==4) return '흐림'; return '-'; }
+function ptyText(v){ const m={0:'없음',1:'비',2:'비/눈',3:'눈',4:'소나기',5:'빗방울',6:'빗방울/눈날림',7:'눈날림'}; return m[v]??'-'; }
+
+async function getGrid() { // 위치 권한 실패 시 논산 고정
+  try {
+    const pos = await new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(res, rej, { timeout: 3000 })
+    );
+    // 실제 위경→격자 변환이 필요하면 별도 로직 추가
+    return { nx: 60, ny: 127 };
+  } catch { return { nx: 60, ny: 127 }; }
+}
+async function refreshWeather() {
+  try {
+    const els = { t: document.querySelector('#temp'), s: document.querySelector('#sky'), p: document.querySelector('#pty') };
+    const { nx, ny } = await getGrid();
+    const r = await fetch(`/api/weather?nx=${nx}&ny=${ny}&type=JSON`);
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.reason||'KMA_FAIL');
+    if (els.t) els.t.textContent = (data.tempC ?? '-') + '℃';
+    if (els.s) els.s.textContent = skyText(data.sky);
+    if (els.p) els.p.textContent = ptyText(data.pty);
+  } catch(e){ console.warn('weather fail', e); }
+}
+refreshWeather(); setInterval(refreshWeather, 10*60*1000);
+
+// ====== AI 채팅 (기존 form과 연동) ======
+async function callAI(prompt){
+  const r = await fetch('/api/ai', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt })});
+  const data = await r.json();
+  if (!data.ok) throw new Error(data.reason||'AI_FAIL');
+  return data.text || '';
+}
+
+// ====== 14개 언어 동시통역 ======
+const srcSel = document.getElementById('srcLang');
+const tgtSel = document.getElementById('tgtLang');
+const btnStart = document.getElementById('interpretingStart');
+const btnStop  = document.getElementById('interpretingStop');
+let stt;
+
+function ttsLangFromTarget(t){ // 대충 매핑(언어코드 → 브라우저 TTS)
+  const map = { ko:'ko-KR', en:'en-US', ja:'ja-JP', zh:'zh-CN', fr:'fr-FR', de:'de-DE', es:'es-ES', pt:'pt-PT', it:'it-IT', ru:'ru-RU', vi:'vi-VN', th:'th-TH', id:'id-ID' };
+  return map[t] || 'en-US';
+}
+async function translateByGemini(text, target){
+  const r = await fetch('/api/interpret', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text, target })});
+  const data = await r.json();
+  if(!data.ok) throw new Error(data.reason||'TR_FAIL');
+  return data.text || '';
+}
+
+btnStart?.addEventListener('click', () => {
+  try {
+    if (!('webkitSpeechRecognition' in window)) { alert('이 브라우저는 음성 인식을 지원하지 않습니다.'); return; }
+    const R = window.webkitSpeechRecognition;
+    stt = new R();
+    stt.lang = srcSel?.value || 'ko-KR';
+    stt.continuous
+ = true;
+    stt.interimResults
+ = false;
+    stt.onresult = async (e) => {
+      const txt = e.results[e.results.length - 1][0].transcript;
+      // 번역 → TTS
+      try {
+        const out = await translateByGemini(txt, (tgtSel?.value||'ko'));
+        speak(out, ttsLangFromTarget(tgtSel?.value||'ko'));
+        // 채팅창에도 표시(옵션)
+        const c = document.getElementById('chat');
+        if (c) {
+          const u = document.createElement('div'); u.className='user'; u.textContent = `[STT] ${txt}`; c.appendChild(u);
+          const b = document.createElement('div'); b.className='bot';  b.textContent = out;     c.appendChild(b);
+          c.scrollTop = c.scrollHeight;
+        }
+      } catch (err) { console.warn('interpret fail', err); }
+    };
+    stt.onerror = () => {};
+    stt.onend   = () => {};
+    stt.start();
+    btnStart.disabled = true; btnStop.disabled = false;
+  } catch {}
+});
+btnStop?.addEventListener('click', () => {
+  try { stt && stt.stop(); } catch {}
+  btnStart.disabled = false; btnStop.disabled = true;
+});
+</script>  
 </body>
 </html>
