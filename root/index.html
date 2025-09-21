@@ -27,19 +27,26 @@
   <!-- 현재 날씨 -->
   <section class="card">
     <header class="card-title">현재 날씨</header>
-    <p id="weatherLoc" class="muted">지역 확인 중…</p>
     <div class="weather-grid">
-      <div>온도: <strong id="temp">로딩 중</strong></div>
-      <div>습도: <strong id="hum">로딩 중</strong></div>
-      <div>강수: <strong id="rain">–</strong></div>
-      <div>풍속: <strong id="wind">로딩 중</strong></div>
+      <div class="weather-row">
+        <div class="weather-label">온도</div><div id="t1">-℃</div>
+      </div>
+      <div class="weather-row">
+        <div class="weather-label">습도</div><div id="h1">-%</div>
+      </div>
+      <div class="weather-row">
+        <div class="weather-label">강수</div><div id="r1">-</div>
+      </div>
+      <div class="weather-row">
+        <div class="weather-label">풍속</div><div id="w1">- m/s</div>
+      </div>
     </div>
     <div class="row-right">
       <button id="btnWeather" class="ghost">날씨 업데이트</button>
     </div>
   </section>
 
-  <!-- AI 비서 (채팅 + 음성) -->
+  <!-- AI 비서 (채팅 + 음성 + 통역) -->
   <section class="card">
     <header class="card-title">AI 비서 채팅</header>
 
@@ -47,9 +54,9 @@
       <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
     </div>
 
-    <form id="chatForm" class="chat-form">
-      <button type="button" id="micBtn" title="음성으로 말하기" class="ghost">🎤</button>
-      <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
+    <form id="chatForm" class="chat-form" autocomplete="off">
+      <button type="button" id="micBtn" title="음성으로 말하기" class="ghost mic-inline">🎤</button>
+      <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" />
       <button type="submit" class="primary">보내기</button>
     </form>
 
@@ -61,24 +68,41 @@
       <button id="ttsStop" class="danger ghost">■ 정지</button>
     </div>
 
-    <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
+    <hr class="divider" />
+
+    <div class="interp-row">
+      <div class="interp-left">
+        <label><input type="checkbox" id="alwaysOn" /> 항상 듣기(자동 재시작)</label>
+        <label class="ml16"><input type="checkbox" id="interpToggle" /> 통역 모드</label>
+      </div>
+      <div class="interp-right">
+        <select id="interpMode" title="통역 방향">
+          <option value="ko-en">한국어 ↔ 영어</option>
+          <option value="ko-ja">한국어 ↔ 일본어</option>
+          <option value="ko-zh">한국어 ↔ 중국어(간체)</option>
+        </select>
+      </div>
+    </div>
+    <p class="hint">※ 특수문자/이모지/마크다운 등은 음성 읽기 전에 자동 정리됩니다.</p>
   </section>
 
-  <!-- 바닥 표시 -->
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
 
-<!-- 에러/거부 자동 표기 -->
-<style>
-  .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
-</style>
+<!-- 커다란 원형 마이크(모바일/터치용) -->
+<button id="fabMic" class="fab-mic" title="말하려면 누르세요">🎙️</button>
+
+<!-- 스크립트 -->
+<script src="/ai.js"></script>
+
+<!-- 에러 뱃지 -->
+<style>.error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}</style>
 <div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
 <script>
-  addEventListener('error',()=>{ document.getElementById('errorBadge').style.display='block';});
-  addEventListener('unhandledrejection',()=>{ document.getElementById('errorBadge').style.display='block';});
+  window.addEventListener
+('error', ()=>{ document.getElementById('errorBadge').style.display='block'; });
+  window.addEventListener
+('unhandledrejection', ()=>{ document.getElementById('errorBadge').style.display='block'; });
 </script>
-
-<!-- 비서/날씨 로직 -->
-<script src="/ai.js?v=2025-09-21-01"></script>
 </body>
 </html>
