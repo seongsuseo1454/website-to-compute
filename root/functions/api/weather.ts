@@ -1,77 +1,65 @@
 // /functions/api/weather.ts
-export const onRequestGet: PagesFunction<{ KMA_KEY: string }> = async ({ request, env }) => {
+export interface Env { KMA_KEY: string }
+
+function toGrid(lat: number, lon: number) {
+  // (논산 대략 좌표 → 기상청 격자 변환) 간단히 고정 격자 사용 원하시면 nx=60, ny=127 사용
+  return { nx: 60, ny: 127 };
+}
+
+function fmtBase(){
+  const d = new Date();
+  // 기상청 초단기실황은 10분 단위, 발표시각 00/10/20/30/40/50분
+  const mm = d.getMinutes();
+  const base = new Date(d);
+  base.setMinutes(Math.floor(mm/10)*10 - 10, 0, 0); // 직전 발표시각
+  const y = base.getFullYear();
+  const m = (base.getMonth()+1).toString().padStart(2,'0');
+  const day = base.getDate().toString().padStart(2,'0');
+  const hh = base.getHours().toString().padStart(2,'0');
+  const min = base.getMinutes().toString().padStart(2,'0');
+  return { base_date: `${y}${m}${day}`, base_time: `${hh}${min}` };
+}
+
+export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   try {
-    const { searchParams } = new URL(request.url);
-    const nx = searchParams.get('nx') || '60';   // 논산 기본 좌표
-    const ny = searchParams.get('ny') || '127';
-    const type = (searchParams.get('type') || 'JSON').toUpperCase();
+    const url = new URL(ctx.request.url);
+    const nx = url.searchParams.get('nx');   // 지정 시 우선
+    const ny = url.searchParams.get('ny');
 
-    const now = new Date();
-    const base = pickBase(now);
-    let base_date = fmtDate(base.date);
-    let base_time = base.time.replace(':', '').padStart(4, '0');
+    const { base_date, base_time } = fmtBase();
+    const grid = nx && ny ? { nx, ny } : toGrid(36.187, 127.098); // 논산 대략 위경도
+    const key = ctx.env.KMA_KEY;
+    const api = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst';
+    const qs = new URLSearchParams({
+      serviceKey: key,
+      pageNo: '1',
+      numOfRows: '60',
+      dataType: 'JSON',
+      base_date, base_time,
+      nx: String(grid.nx), ny: String(grid.ny)
+    });
 
-    const url = new URL(
-      'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst'
-    );
-    url.searchParams.set('serviceKey', encodeURIComponent(env.KMA_KEY));
-    url.searchParams.set('numOfRows', '1000');
-    url.searchParams.set('pageNo', '1');
-    url.searchParams.set('dataType', type);
-    url.searchParams.set('base_date', base_date);
-    url.searchParams.set('base_time', base_time);
-    url.searchParams.set('nx', nx);
-    url.searchParams.set('ny', ny);
+    const res = await fetch(`${api}?${qs.toString()}`);
+    if (!res.ok) throw new Error('KMA HTTP '+res.status);
+    const json: any = await res.json();
 
-    const r = await fetch(url.toString());
-    if (!r.ok) return j({ ok: false, reason: 'HTTP_' + r.status }, 502);
-    const data = await r.json();
-    const items = data?.response?.body?.items?.item ?? [];
-    if (!Array.isArray(items) || items.length === 0)
-      return j({ ok: false, reason: 'EMPTY', base_date, base_time }, 200);
+    const items = json?.response?.body?.items?.item
+ || [];
+    const map: Record<string,string> = {};
+    for (const it of items) map[it.category] = it.obsrValue;
 
-    const s = summarize(items);
-    return j({ ok: true, base_date, base_time, ...s });
-  } catch (e: any) {
-    return j({ ok: false, reason: 'EXCEPTION', detail: String(e?.message || e) }, 500);
+    const tempC = map.T1H ? Number(map.T1H) : undefined;   // 기온(℃)
+    const reh   = map.REH ? Number(map.REH) : undefined;   // 습도(%)
+    const wsd   = map.WSD ? Number(map.WSD) : undefined;   // 풍속(m/s)
+    const rn1   = map.RN1 ? (map.RN1 === '강수없음' ? 0 : Number(map.RN1)) : 0; // 1시간 강수(mm)
+
+    return new Response(JSON.stringify({ ok:true, tempC, reh, wsd, rn1 }), {
+      headers: { 'content-type': 'application/json; charset=utf-8' }
+    });
+  } catch (e:any) {
+    return new Response(JSON.stringify({ ok:false, error:String(e?.message||e) }), {
+      status: 200, headers: { 'content-type': 'application/json; charset=utf-8' }
+    });
   }
 };
-
-function pickBase(now: Date) {
-  // 발표시각 02,05,08,11,14,17,20,23
-  const cand = [23, 20, 17, 14, 11, 8, 5, 2];
-  const h = now.getHours();
-  for (const x of cand) if (h >= x) return { date: now, time: `${pad2(x)}:00` };
-  // 0~1시는 전날 23:00
-  const y = new Date(now.getTime() - 86400000);
-  return { date: y, time: '23:00' };
-}
-function pad2(n: number) { return String(n).padStart(2, '0'); }
-function fmtDate(d: Date) {
-  return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`;
-}
-
-function summarize(items: any[]) {
-  const pick = (cat: string) => items.find((it) => it.category === cat)?.fcstValue;
-
-  const tempC = pick('T1H');  // 기온
-  const pty   = pick('PTY');  // 강수형태
-  const sky   = pick('SKY');  // 하늘상태
-  const rn1   = pick('RN1');  // 1시간 강수량
-  const wsd   = pick('WSD');  // 풍속
-  const reh   = pick('REH');  // 습도
-
-  return { 
-    tempC: tempC ? Number(tempC) : null,
-    pty: pty ?? null,
-    sky: sky ?? null,
-    rn1: rn1 ? Number(rn1) : null,
-    wsd: wsd ? Number(wsd) : null,
-    reh: reh ? Number(reh) : null,
-  };
-}
-
-function j(data: any, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-}
 
