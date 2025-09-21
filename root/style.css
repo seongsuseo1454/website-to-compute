@@ -49,3 +49,9 @@
   .hero h1{font-size:20px}
   .clock{font-size:24px}
 }
+
+/* ===== 통역 UI 보조 ===== */
+.btn-xl { font-size: 18px; padding: 14px 18px; border-radius: 12px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.row { display:flex; }
+.card textarea { background: rgba(0,0,0,.15); color: #e5e7eb; border: 1px solid rgba(255,255,255,.06); }
