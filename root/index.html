@@ -1,101 +1,58 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>시장님 집무실 · 스마트 미러 PRO</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>시장님 집무실 · 스마트 미러 PRO</title>
 
-  <!-- PWA -->
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" sizes="192x192" href="/icon-192.png" />
-  <link rel="icon" sizes="512x512" href="/icon-512.png" />
-  <meta name="theme-color" content="#0b0f19" />
+<!-- PWA -->
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" sizes="192x192" href="/icon-192.png" />
+<link rel="icon" sizes="512x512" href="/icon-512.png" />
+<meta name="theme-color" content="#0b0f19" />
 
-  <link rel="stylesheet" href="/style.css" />
+<link rel="stylesheet" href="/style.css" />
 </head>
 <body>
 <main class="container">
   <!-- 상단 인사/시계 -->
   <section class="hero">
     <div>
-      <h1 id="greet">시장님 안녕하세요</h1>
+      <h1 id="greet">활기찬 하루입니다, 시장님</h1>
       <p class="sub" id="today"></p>
     </div>
     <div class="clock" id="clock">--:--</div>
   </section>
 
-  <!-- 현재 날씨 -->
+  <!-- 빠른 업무 트리거 (#trstart 유지) -->
+  <section id="trstart" class="card">
+    <div class="title">업무 트리거 & 빠른 전환</div>
+    <div class="desc">대표/총괄실장 단축 패널입니다. 자주 쓰는 명령을 터치로 실행하세요.</div>
+    <div class="row">
+      <button class="btn" onclick="
+        document.getElementById('msgInput').value='내일 10시 복지과 회의 추가';
+        document.getElementById('chatForm').dispatchEvent(new Event('submit',{cancelable:true}))">
+        내일 10시 회의 추가
+      </button>
+      <button class="btn" onclick="location.href='/admin.html'">관리자 입력창</button>
+    </div>
+  </section>
+
+  <!-- 오늘의 날씨 -->
   <section class="card">
-    <header class="card-title">현재 날씨</header>
-    <div class="grid2">
-      <div>
-        <div class="muted" id="locHint">지역 확인 중…</div>
-        <div class="row"><span>온도:</span><b id="wTemp">- °C</b></div>
-        <div class="row"><span>습도:</span><b id="wHum">- %</b></div>
-        <div class="row"><span>강수:</span><b id="wRain">- mm</b></div>
-        <div class="row"><span>풍속:</span><b id="wWind">- m/s</b></div>
-      </div>
-      <div class="right">
-        <button id="btnWeather" class="ghost">날씨 업데이트</button>
-      </div>
-    </div>
+    <header class="card-title">오늘의 날씨</header>
+    <div id="weatherBox" class="weather">불러오는 중...</div>
   </section>
 
-   <!-- ⬇️⬇️ 여기에 일정 카드 추가 -->
-  <section class="card" id="scheduleCard">
-    <header class="card-title">오늘 일정 요약</header>
-    <div class="row right"><button id="btnSched" class="ghost">새로고침</button></div>
-
-    <ul id="schedList" class="sched-list">
-      <!-- JS로 채움 -->
-    </ul>
-
-    <div class="tts-row">
-      <button id="schedSpeak" class="ghost">📢 일정 요약 읽기</button>
-    </div>
-  </section>
-  <!-- ⬆️⬆️ 일정 카드 끝 -->
-
-  <!-- 시정뉴스 -->
-<section class="card" id="newsCard">
-  <header class="card-title row">
-    <span>시정 뉴스</span>
-    <span class="muted small" id="newsUpdated"></span>
-  </header>
-
-  <ul id="newsList" class="bullet-list"></ul>
-
-  <div class="row right gap8">
-    <button id="btnNews" class="ghost">새로고침</button>
-    <button id="btnNewsSpeak" class="ghost">📢 요약 읽기</button>
-  </div>
-</section>
-
-<!-- 부서별 업무보고 -->
-<section class="card" id="reportCard">
-  <header class="card-title row">
-    <span>부서별 업무보고</span>
-    <span class="muted small" id="repUpdated"></span>
-  </header>
-
-  <ul id="repList" class="bullet-list"></ul>
-
-  <div class="row right gap8">
-    <button id="btnRep" class="ghost">새로고침</button>
-    <button id="btnRepSpeak" class="ghost">📢 요약 읽기</button>
-  </div>
-</section>
-  
   <!-- AI 비서 (채팅 + 음성) -->
   <section class="card">
-    <header class="card-title">AI 비서 채팅</header>
-
+    <header class="card-title">AI 비서 (채팅 + 음성)</header>
     <div id="chat" class="chat">
       <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
     </div>
 
     <form id="chatForm" class="chat-form">
-      <button type="button" id="micBtn" title="음성으로 말하기" class="ghost mic-lg">🎤</button>
+      <button type="button" id="micBtn" title="음성으로 말하기" class="ghost big-mic">🎤</button>
       <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
       <button type="submit" class="primary">보내기</button>
     </form>
@@ -107,58 +64,170 @@
       <button id="ttsResume" class="ghost">▶︎ 재개</button>
       <button id="ttsStop" class="danger ghost">■ 정지</button>
     </div>
-
     <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
   </section>
 
-  <!-- 실시간 통역 -->
+  <!-- 오늘 일정 -->
   <section class="card">
-    <header class="card-title">실시간 통역</header>
+    <header class="card-title">오늘 일정</header>
+    <ul id="schedList" class="sched"></ul>
+  </section>
 
-    <div class="lang-row">
-      <div>
-        <small>입력(말하기) 언어</small>
-        <select id="srcLang"></select>
-      </div>
-      <div>
-        <small>출력(읽어주기) 언어</small>
-        <select id="tgtLang"></select>
-      </div>
-      <div class="right">
-        <button id="trStart" class="ghost">🎙️ 통역 시작</button>
-        <button id="trStop" class="danger ghost">■ 통역 정지</button>
-      </div>
+  <!-- 시정 뉴스 / 부서별 보고 -->
+  <section class="grid">
+    <div class="card">
+      <header class="card-title">시정 뉴스</header>
+      <ul id="newsList" class="feed"></ul>
     </div>
-
-    <div class="trans-box">
-      <div class="trans-in">
-        <div class="muted">[입력 자막]</div>
-        <div id="trIn" class="bubble"></div>
-      </div>
-      <div class="trans-out">
-        <div class="muted">[번역 결과]</div>
-        <div id="trOut" class="bubble strong"></div>
-      </div>
+    <div class="card">
+      <header class="card-title">부서별 업무보고</header>
+      <ul id="deptList" class="feed"></ul>
     </div>
-    <p class="hint">※ API가 비활성(405 등)이어도 통역은 내장 백업(오픈 LibreTranslate)으로 동작합니다.</p>
   </section>
 
   <!-- 바닥 표시 -->
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
 
-<!-- 비즈니스 로직 -->
-<script src="/ai.js" type="module"></script>
-
-<!-- 경고 배지 -->
-<style>.error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}</style>
+<!-- 에러 배지 -->
+<style>
+.error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
+</style>
 <div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
+
+<!-- 스크립트 -->
+<script src="/ai.js"></script>
 <script>
-  window.addEventListener
-('error', ()=>{ document.getElementById('errorBadge').style.display='block'; });
-  window.addEventListener
-('unhandledrejection', ()=>{ document.getElementById('errorBadge').style.display='block'; });
+/* ===== 공통 ===== */
+const $ = (s)=>document.querySelector(s);
+const chat = $('#chat'), input=$('#msgInput'), form=$('#chatForm');
+const micBtn=$('#micBtn'), ttsToggle=$('#ttsToggle');
+const ttsPause=$('#ttsPause'), ttsResume=$('#ttsResume'), ttsStop=$('#ttsStop');
+
+// 시계/날짜/인사
+function tick(){
+  const now=new Date();
+  $('#clock').textContent = now.toLocaleTimeString
+('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  $('#today').textContent = now.toLocaleDateString
+('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'});
+  const h=now.getHours();
+  $('#greet').textContent = (h<12?'좋은 아침입니다':'활기찬 하루입니다') + ', 시장님';
+}
+setInterval(tick,1000); tick();
+
+// 채팅 출력
+function pushMsg(role, text){
+  const div=document.createElement('div');
+  div.className = role==='user'?'user':'bot';
+  div.textContent = text;
+  chat.appendChild
+(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+/* ===== TTS ===== */
+function speak(text){
+  if(!ttsToggle.checked) return;
+  const line = window.sanitizeForTTS ? window.sanitizeForTTS(text): text;
+  if(!line) return;
+  window.speechSynthesis.cancel
+();
+  const u=new SpeechSynthesisUtterance(line);
+  u.lang='ko-KR'; u.rate=1.0; u.pitch=1.0;
+  window.speechSynthesis.speak(u);
+}
+ttsPause.onclick=()=>window.speechSynthesis.pause();
+ttsResume.onclick=()=>window.speechSynthesis.resume();
+ttsStop.onclick=()=>window.speechSynthesis.cancel
+();
+
+/* ===== STT ===== */
+let rec;
+if('webkitSpeechRecognition' in window){
+  const R=window.webkitSpeechRecognition; rec=new R();
+  rec.lang='ko-KR'; rec.continuous
+=false; rec.interimResults
+=false;
+  rec.onresult=(e)=>{ const txt=e.results[0][0].transcript; input.value=txt;
+    form.dispatchEvent(new Event('submit',{cancelable:true})); };
+  rec.onerror=()=>alert('음성 인식 오류. 다시 시도해 주세요.');
+}else{
+  micBtn.disabled=true; micBtn.title='이 브라우저는 음성 인식을 지원하지 않습니다.';
+}
+micBtn.onclick=()=>{ try{ rec && rec.start(); }catch(_){} };
+
+/* ===== AI 호출 ===== */
+async function callAI(prompt){
+  if(typeof window.askAI==='function') return await window.askAI(prompt);
+  const res = await fetch('/api/ai',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt})});
+  if(!res.ok) throw new Error('AI 응답 실패');
+  const data=await res.json();
+  return data.text || data.reply || JSON.stringify(data);
+}
+
+/* ===== 전송 처리 ===== */
+form.addEventListener
+('submit', async (e)=>{
+  e.preventDefault();
+  const q=input.value.trim(); if(!q) return;
+  input.value=''; pushMsg('user',q);
+  try{
+    const a = await callAI(q);
+    pushMsg('bot', a); speak(a);
+  }catch(err){
+    const msg='에러가 발생했습니다. 곧 조치하겠습니다.'; pushMsg('bot', msg); speak(msg);
+    // 원격 보고(무음 실패 허용)
+    fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'AI_FAIL',detail:String(err)})}).catch(()=>{});
+  }
+});
+
+/* ===== 날씨 ===== */
+async function loadWeather(){
+  try{
+    // 기본 좌표(서울) – 모바일 위치권한 없을 때 대비
+    const nx=60, ny=127;
+    const res = await fetch(`/api/weather?nx=${nx}&ny=${ny}`);
+    const data = await res.json();
+    const txt = data?.summary || '날씨 정보를 불러올 수 없습니다.';
+    $('#weatherBox').textContent = txt;
+  }catch{ $('#weatherBox').textContent='날씨 정보를 불러올 수 없습니다.'; }
+}
+loadWeather();
+
+/* ===== 일정/뉴스/보고 ===== */
+// 서버 저장 데이터 로드
+async function loadKV(listId, key){
+  try{
+    const res = await fetch(`/api/admin?list=${encodeURIComponent(key)}`);
+    if(!res.ok) throw 0;
+    const items = await res.json(); renderList(listId, items);
+  }catch{ renderList(listId, []); }
+}
+
+function renderList(id, items){
+  const el=$(id); el.innerHTML='';
+  if(!items || !items.length){
+    const li=document.createElement('li'); li.className='empty';
+    li.textContent='등록된 항목이 없습니다.'; el.appendChild(li); return;
+  }
+  for(const it of items){
+    const li=document.createElement('li');
+    li.innerHTML=`<div class="feed-title">${it.title||it.text}</div>
+                  <div class="feed-sub">${it.time||it.source||''} ${it.location||''}</div>`;
+    el.appendChild(li);
+  }
+}
+
+loadKV('#schedList','SCHEDULE:TODAY');
+loadKV('#newsList','NEWS');
+loadKV('#deptList','DEPT');
+
+/* ===== 에러배지 & 최소 리포트 ===== */
+window.addEventListener
+('error',()=>{$('#errorBadge').style.display='block';});
+window.addEventListener
+('unhandledrejection',()=>{$('#errorBadge').style.display='block';});
 </script>
-<script type="module" src="/interpreter.js"></script>  
 </body>
 </html>
