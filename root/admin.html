@@ -1,119 +1,67 @@
 <!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>관리자 입력창 · 일정/시정뉴스/업무보고</title>
-  <link rel="stylesheet" href="/style.css"/>
+<html lang="ko"><head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>관리자 입력 · 스마트미러</title>
+<link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <main class="container">
-    <section class="card">
-      <header class="card-title">인증</header>
-      <input id="token" type="password" placeholder="관리자 토큰을 입력하세요" />
-      <p class="hint">※ 총괄실장이 발급한 토큰과 동일해야 등록됩니다.</p>
-    </section>
+<main class="container">
+  <section class="card">
+    <header class="card-title">관리자 로그인</header>
+    <input id="admTok" placeholder="ADMIN_TOKEN" class="input" />
+  </section>
 
-    <section class="card">
-      <header class="card-title">일정 등록</header>
-      <div class="grid">
-        <input id="scDate" type="date"/>
-        <input id="scTime" type="time"/>
-        <input id="scTitle" type="text" placeholder="제목"/>
-        <input id="scLoc" type="text" placeholder="장소"/>
-      </div>
-      <button id="btnSc" class="primary">등록</button>
-    </section>
+  <section class="grid">
+    <div class="card">
+      <header class="card-title">오늘 일정 추가</header>
+      <input id="s_time" placeholder="예: 10:00" class="input" />
+      <input id="s_title" placeholder="제목" class="input" />
+      <input id="s_loc" placeholder="장소(선택)" class="input" />
+      <button class="primary" onclick="saveSched()">저장</button>
+      <button class="ghost" onclick="loadList('SCHEDULE:TODAY','#list1')">불러오기</button>
+      <ul id="list1" class="feed" style="margin-top:8px"></ul>
+    </div>
 
-    <section class="card">
-      <header class="card-title">시정뉴스 등록</header>
-      <div class="grid">
-        <input id="nwTitle" type="text" placeholder="제목"/>
-        <input id="nwSubtitle" type="text" placeholder="요약"/>
-        <input id="nwLink" type="url" placeholder="링크(선택)"/>
-      </div>
-      <button id="btnNw" class="primary">등록</button>
-    </section>
+    <div class="card">
+      <header class="card-title">시정 뉴스 추가</header>
+      <input id="n_title" placeholder="제목" class="input" />
+      <input id="n_src" placeholder="출처/부서" class="input" />
+      <button class="primary" onclick="saveNews()">저장</button>
+      <button class="ghost" onclick="loadList('NEWS','#list2')">불러오기</button>
+      <ul id="list2" class="feed" style="margin-top:8px"></ul>
+    </div>
 
-    <section class="card">
-      <header class="card-title">업무보고 등록</header>
-      <div class="grid">
-        <input id="rpDept" type="text" placeholder="부서명"/>
-        <input id="rpTitle" type="text" placeholder="제목"/>
-        <textarea id="rpBody" rows="4" placeholder="주요 내용"></textarea>
-      </div>
-      <button id="btnRp" class="primary">등록</button>
-    </section>
+    <div class="card">
+      <header class="card-title">부서별 업무보고 추가</header>
+      <input id="d_title" placeholder="보고 제목" class="input" />
+      <input id="d_dept" placeholder="부서명" class="input" />
+      <button class="primary" onclick="saveDept()">저장</button>
+      <button class="ghost" onclick="loadList('DEPT','#list3')">불러오기</button>
+      <ul id="list3" class="feed" style="margin-top:8px"></ul>
+    </div>
+  </section>
+</main>
 
-    <section class="card">
-      <header class="card-title">최근 항목</header>
-      <button id="refresh" class="ghost">새로고침</button>
-      <div class="two-col">
-        <div>
-          <h4>일정</h4>
-          <ul id="listSc" class="list small"></ul>
-        </div>
-        <div>
-          <h4>뉴스</h4>
-          <ul id="listNw" class="list small"></ul>
-        </div>
-      </div>
-      <div>
-        <h4>업무보고</h4>
-        <ul id="listRp" class="list small"></ul>
-      </div>
-    </section>
-  </main>
-
-  <script>
-    function val(id){ return document.getElementById(id).value.trim(); }
-    async function post(url, body){
-      const token = val('token');
-      if(!token){ alert('관리자 토큰을 먼저 입력하세요.'); return; }
-      const res = await fetch(url,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-admin-token':token},
-        body: JSON.stringify(body)
-      });
-      if(!res.ok){ alert('실패: '+res.status); return; }
-      alert('등록되었습니다.');
-      refresh();
-    }
-    async function get(url){
-      const res = await fetch(url);
-      if(!res.ok) return [];
-      return res.json();
-    }
-    function render(ul, items, mapFn){
-      ul.innerHTML='';
-      if(!items.length){ ul.innerHTML='<li class="empty">없음</li>'; return; }
-      items.forEach(it=>{
-        const li=document.createElement('li');
-        li.innerHTML = mapFn(it);
-        ul.appendChild(li);
-      });
-    }
-    async function refresh(){
-      const [sc, nw, rp] = await Promise.all([
-        get('/api/schedule'), get('/api/news'), get('/api/reports')
-      ]);
-      render(document.getElementById('listSc'), sc, it=>`${it.date} ${it.time||''} · ${it.title}`);
-      render(document.getElementById('listNw'), nw, it=>`${it.title} – ${it.subtitle||''}`);
-      render(document.getElementById('listRp'), rp, it=>`[${it.department}] ${it.title}`);
-    }
-    document.getElementById('refresh').onclick=refresh;
-
-    document.getElementById('btnSc').onclick=()=>post('/api/schedule',{
-      date: val('scDate'), time: val('scTime'), title: val('scTitle'), location: val('scLoc')
-    });
-    document.getElementById('btnNw').onclick=()=>post('/api/news',{
-      title: val('nwTitle'), subtitle: val('nwSubtitle'), link: val('nwLink')
-    });
-    document.getElementById('btnRp').onclick=()=>post('/api/reports',{
-      department: val('rpDept'), title: val('rpTitle'), body: val('rpBody')
-    });
-
-    refresh();
-  </script>
-</body>
-</html>
+<script>
+async function kvPush(kind, payload){
+  const token = document.getElementById('admTok').value.trim();
+  const res = await fetch('/api/admin',{ method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ token, kind, payload })});
+  const j = await res.json(); alert(j.msg||'완료'); 
+}
+async function loadList(listKey, sel){
+  const res = await fetch('/api/admin?list='+encodeURIComponent(listKey));
+  const arr = await res.json(); const box=document.querySelector(sel); box.innerHTML
+='';
+  if(!arr.length){ const li=document.createElement('li'); li.className='empty'; li.textContent='없음'; box.appendChild
+(li); return;}
+  for(const it of arr){
+    const li=document.createElement('li'); li.innerHTML=`<div class="feed-title">${it.title||it.text}</div><div class="feed-sub">${it.time||it.source||it.dept||''}</div>`; box.appendChild
+(li);
+  }
+}
+function saveSched(){ kvPush('SCHEDULE:TODAY',{ time: document.getElementById('s_time').value, title: document.getElementById('s_title').value, location: document.getElementById('s_loc').value }); }
+function saveNews(){ kvPush('NEWS',{ title: document.getElementById('n_title').value, source: document.getElementById('n_src').value }); }
+function saveDept(){ kvPush('DEPT',{ title: document.getElementById('d_title').value, dept: document.getElementById('d_dept').value }); }
+</script>
+</body></html>
