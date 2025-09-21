@@ -1,118 +1,169 @@
-/* ====== KMA 날씨 업데이트 ====== */
-// 논산(예시) 격자
-const NX = 60;
-const NY = 127;
-// 화면 레이블 (원하는 지명)
-const LOCATION_LABEL = '논산시';
+// ===== DOM =====
+const $ = (s) => document.querySelector(s);
+const chat = $('#chat');
+const input = $('#msgInput');
+const form = $('#chatForm');
+const micBtn = $('#micBtn');
+const ttsToggle = $('#ttsToggle');
+const ttsPause = $('#ttsPause');
+const ttsResume = $('#ttsResume');
+const ttsStop = $('#ttsStop');
 
-function setWeatherLabel() {
-  const $label = document.getElementById('weatherLabel');
-  if ($label) $label.textContent = `${LOCATION_LABEL} 현재 날씨`;
+// ===== 시계/인사 =====
+function tick() {
+  const now = new Date();
+  $('#clock').textContent = now.toLocaleTimeString
+('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  $('#today').textContent = now.toLocaleDateString
+('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long' });
+}
+setInterval(tick, 1000); tick();
+
+// ===== 채팅 유틸 =====
+function pushMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = role === 'user' ? 'user' : 'bot';
+  div.textContent = text;
+  chat.appendChild
+(div);
+  chat.scrollTop = chat.scrollHeight;
 }
 
-// KMA 카테고리 -> DOM id 매핑
-const CAT_TO_ID = {
-  T1H: 't1h', // 기온(℃)
-  REH: 'reh', // 습도(%)
-  RN1: 'rn1', // 1시간 강수량(mm)
-  WSD: 'wsd', // 풍속(m/s)
-};
-
-async function fetchWeatherKMA(nx, ny) {
-  // functions/api/weather 을 프록시로 사용 (키는 서버에서 보관)
-  // 서버가 date/time을 알아서 최근 가용 시각으로 보정하도록 구현되어 있다면
-  // 아래처럼 심플 호출이 가장 안전합니다.
-  const res = await fetch(`/api/weather?nx=${nx}&ny=${ny}&type=JSON`);
-  if (!res.ok) throw new Error('날씨 API 실패');
-  return res.json();
+// ===== TTS(특수문자/이모지 제거 후 읽기) =====
+export function sanitizeForTTS(input) {
+  let s = String(input || '');
+  s = s.replace(/https?:\/\/\S+/g, ' ');                          // 링크 제거
+  s = s.replace(/[#*_`>~|:[\](){}/\\\-]+/g, ' ');                  // 마크다운/특수문자
+  try { s = s.replace(/\p{Extended_Pictographic}/gu, ' '); } catch(e) {} // 대부분 이모지
+  s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');              // 제어문자
+  return s.replace(/\s{2,}/g, ' ').trim();
 }
 
-function renderWeatherFromItems(items = []) {
-  // 모든 값을 기본 '-'로 초기화
-  Object.values(CAT_TO_ID).forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = '-';
-  });
+function speak(text) {
+  if (!ttsToggle.checked) return;
+  const line = sanitizeForTTS(text);
+  if (!line) return;
+  speechSynthesis.cancel
+();
+  const u = new SpeechSynthesisUtterance(line);
+  u.lang = 'ko-KR';
+  u.rate = 1.0;
+  u.pitch = 1.0;
+  speechSynthesis.speak(u);
+}
+ttsPause.onclick  = () => speechSynthesis.pause();
+ttsResume.onclick = () => speechSynthesis.resume();
+ttsStop.onclick   = () => speechSynthesis.cancel
+();
 
-  // 카테고리별 최신 값 채우기
-  for (const it of items) {
-    const id = CAT_TO_ID[it.category];
-    if (!id) continue;
-    const el = document.getElementById(id);
-    if (!el) continue;
-    // 표시값 정리
-    let v = it.obsrValue ?? it.fcstValue ?? '-';
-    if (it.category === 'RN1' && (v === '0' || v === 0)) v = '없음';
-    el.textContent = v;
+// ===== STT(웹킷 인식) =====
+let rec;
+if ('webkitSpeechRecognition' in window) {
+  const R = window.webkitSpeechRecognition;
+  rec = new R();
+  rec.lang = 'ko-KR';
+  rec.continuous
+ = false;
+  rec.interimResults
+ = false;
+  rec.onresult = (e) => {
+    const txt = e.results[0][0].transcript;
+    input.value = txt;
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+  };
+  rec.onerror = () => alert('음성 인식 중 오류가 발생했습니다. 다시 시도해 주세요.');
+} else {
+  micBtn.disabled = true;
+  micBtn.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
+}
+micBtn.onclick = () => { try { rec && rec.start(); } catch {} };
+
+// ===== AI 호출 (ai.js 내 askAI가 있으면 사용, 없으면 /api/ai 폴백) =====
+window.askAI ??= null; // 외부에서 주입 가능
+async function callAI(prompt) {
+  if (typeof window.askAI === 'function') {
+    return await window.askAI(prompt);
   }
+  const res = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
+  });
+  if (!res.ok) throw new Error('AI 응답 실패: ' + res.status);
+  const data = await res.json();
+  return data.text || data.reply || JSON.stringify(data);
 }
+
+// ===== 전송 처리 =====
+form.addEventListener
+('submit', async (e) => {
+  e.preventDefault();
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  pushMsg('user', q);
+
+  try {
+    const a = await callAI(q);
+    pushMsg('bot', a);
+    speak(a);
+  } catch (err) {
+    const msg = '에러가 발생했습니다. 곧 조치하겠습니다.';
+    pushMsg('bot', msg);
+    speak(msg);
+    // 필요 시 원격 알림 연동:
+    // safeFetch('/api/report', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ type:'AI_FAIL', detail:String(err) }) });
+  }
+});
+
+// ===== 날씨 =====
+const elTemp = $('#temp');
+const elHum  = $('#hum');
+const elRain = $('#rain');
+const elWind = $('#wind');
+const elLoc  = $('#weatherLoc');
+
+function setWeatherLoading() {
+  elTemp.textContent = '로딩 중';
+  elHum.textContent  = '로딩 중';
+  elWind.textContent = '로딩 중';
+  elRain.textContent = '–';
+  elLoc.textContent  = '지역 확인 중…';
+}
+setWeatherLoading();
 
 async function updateWeather() {
   try {
-    setWeatherLabel();
-    const data = await fetchWeatherKMA(NX, NY);
+    const res = await fetch('/api/weather', { cache: 'no-store' });
+    if (!res.ok) throw new Error('weather http ' + res.status);
+    const w = await res.json();
 
-    // 서버 구현에 따라 형태가 조금 다를 수 있습니다.
-    // 1) { items: [...] } 형태
-    // 2) { response: { body: { items: { item: [...] }}}} 형태
-    let items = [];
-    if (Array.isArray(data?.items)) {
-      items = data.items
-;
-    } else if (Array.isArray(data?.response?.body?.items?.item
-)) {
-      items = data.response.body.items.item
-;
-    }
-
-    renderWeatherFromItems(items);
+    elTemp.textContent = (w.temp != null) ? `${w.temp}°C` : '–';
+    elHum.textContent  = (w.humidity != null) ? `${w.humidity}%` : '–';
+    elWind.textContent = (w.wind_ms != null) ? `${w.wind_ms} m/s` : '–';
+    elRain.textContent = (w.rain != null) ? w.rain : '–';
+    elLoc.textContent  = w.region || '논산';
   } catch (e) {
-    console.warn('날씨 업데이트 실패:', e);
-    // 실패 시 화면은 '-'로 유지
+    elTemp.textContent = '–';
+    elHum.textContent  = '–';
+    elWind.textContent = '–';
+    elLoc.textContent  = '네트워크 점검 중';
   }
 }
-
-/* ===== STT (보다 견고하게) ===== */
-let rec;
-
-async function ensureMicPermission() {
-  // 일부 환경에서 Recognition 시작 전에 권한 프롬프트가 안 뜨는 경우가 있어 선요청
-  try { await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { /* 사용자가 취소할 수도 있음 */ }
-}
-
-function initSTT() {
-  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!R) {
-    micBtn.disabled = true;
-    micBtn.title = '이 브라우저는 음성 입력(STT)을 지원하지 않습니다. Chrome/Edge를 사용하세요.';
-    return;
-  }
-  rec = new R();
-  rec.lang = 'ko-KR';
-  rec.continuous = false;
-  rec.interimResults = false;
-
-  rec.onresult = (e) => {
-    const txt = e.results?.[0]?.[0]?.transcript || '';
-    if (txt) {
-      input.value = txt;
-      form.dispatchEvent(new Event('submit', { cancelable: true }));
-    }
-  };
-  rec.onerror = (ev) => {
-    alert('음성 인식 오류: ' + (ev?.error || '알 수 없음') + '\n마이크 권한/네트워크를 확인하세요.');
-  };
-
-  micBtn.onclick = async () => {
-    try {
-      await ensureMicPermission();
-      rec.start();
-    } catch (_) {}
-  };
-}
-
-initSTT();
-
-// 최초 1회 + 버튼
-document.getElementById('btnWeather')?.addEventListener('click', updateWeather);
+document.getElementById('btnWeather').onclick = updateWeather;
 updateWeather();
+
+// ===== 안전 fetch 래퍼 & 에러 리포트(선택) =====
+async function safeFetch(input, init) {
+  try {
+    const res = await fetch(input, init);
+    if (!res.ok) {
+      // 간단 리포트(선택)
+      // await fetch('/api/report', { method:'POST', body: JSON.stringify({ type:'http', code: res.status, url: String(input) }), keepalive:true });
+    }
+    return res;
+  } catch (e) {
+    // await fetch('/api/report', { method:'POST', body: JSON.stringify({ type:'network', detail: String(e), url: String(input) }), keepalive:true });
+    throw e;
+  }
+}
