@@ -177,5 +177,111 @@
       }
     });
   </script>
+  <script>
+/* ===== AIDEV-NOTE: 브라우저 에러/거부/네트워크 실패 자동 리포트 ===== */
+
+(function () {
+  const REPORT_URL = '/api/report';
+  const REPORT_SAMPLE_RATE = 1.0; // 0~1.0, 과도한 전송 방지용
+  const REPORT_COOLDOWN_MS = 10_000; // 동일 에러 과도 전송 방지(10초)
+  const STORAGE_KEY = 'last_error_sig';
+
+  function hash(s) { // 간단한 시그니처
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return String(h);
+  }
+
+  function shouldSample() {
+    return Math.random() <= REPORT_SAMPLE_RATE;
+  }
+
+  function dedupe(signature) {
+    try {
+      const item = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      const now = Date.now();
+      if (item.sig === signature && now - item.ts < REPORT_COOLDOWN_MS) return false;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ sig: signature, ts: now }));
+      return true;
+    } catch { return true; }
+  }
+
+  async function reportError(payload) {
+    try {
+      if (!shouldSample()) return;
+      const sig = hash([payload.type, payload.message
+, payload.stack].filter(Boolean).join('|'));
+      if (!dedupe(sig)) return;
+
+      await fetch(REPORT_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          ...payload,
+          sig,
+          url: location.href,
+          ua: navigator.userAgent
+,
+          at: new Date().toISOString(),
+          // 개인정보/토큰이 포함될 수 있는 로컬스토리지/쿠키/폼 내용은 절대 전송하지 않음
+        }),
+        keepalive: true,
+      });
+    } catch { /* 리포트 실패는 무시 */ }
+  }
+
+  // 1) 런타임 에러
+  window.addEventListener
+('error', (ev) => {
+    reportError({
+      type: 'error',
+      message: ev?.message,
+      filename: ev?.filename,
+      lineno: ev?.lineno,
+      colno: ev?.colno,
+      stack: ev?.error?.stack?.toString()?.slice(0, 2000),
+    });
+  });
+
+  // 2) Promise 미처리 거부
+  window.addEventListener
+('unhandledrejection', (ev) => {
+    const reason = ev?.reason;
+    reportError({
+      type: 'unhandledrejection',
+      message: (reason && (reason.message
+ || reason.toString
+())) || 'unhandledrejection',
+      stack: reason && reason.stack ? String(reason.stack).slice(0, 2000) : undefined,
+    });
+  });
+
+  // 3) fetch 래퍼: API 실패 자동 리포트(선택)
+  window.safeFetch = async function safeFetch(input, init) {
+    const res = await fetch(input, init).catch((e) => {
+      reportError({ type: 'network', message: 'fetch_failed', detail: String(e), req: String(input) });
+      throw e;
+    });
+    if (!res.ok) {
+      reportError({
+        type: 'api',
+        message: 'http_' + res.status,
+        req: String(input),
+      });
+    }
+    return res;
+  };
+
+  // 4) 수동 리포트 API (개발자/비서가 호출 가능)
+  window.reportAiProblem = function (hint) {
+    reportError({ type: 'ai', message: 'AI 응답 이상', detail: hint });
+  };
+
+  // 5) 주기적 하트비트(선택): 서비스 정상 동작 확인
+  (async () => {
+    try { await fetch('/api/report?ping=1', { method: 'GET', keepalive: true }); } catch {}
+  })();
+})();
+</script>
 </body>
 </html>
