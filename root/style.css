@@ -72,3 +72,7 @@ button.mic.big{font-size:20px;padding:10px 12px}
 .row.gap8 > * + * { margin-left:8px; }
 .small { font-size:.85rem; }
 .muted { opacity:.7; }
+#trStart, #trStop {
+  font-size: 18px;
+  padding: 12px 16px;
+  border-radius: 12px;
