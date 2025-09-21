@@ -55,3 +55,8 @@
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .row { display:flex; }
 .card textarea { background: rgba(0,0,0,.15); color: #e5e7eb; border: 1px solid rgba(255,255,255,.06); }
+
+/* style.css 일부 예시 */
+.badge{display:inline-block;margin-left:.5rem;padding:.15rem .5rem;border-radius:.5rem;
+  font-size:.75rem;line-height:1;background:#e5f2ff;color:#0366d6}
+.badge.pro{background:#ffeaea;color:#c62828}
