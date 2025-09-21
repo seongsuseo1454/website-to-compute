@@ -104,6 +104,12 @@
   window.addEventListener
 ('unhandledrejection', ()=>{ document.getElementById('errorBadge').style.display='block'; });
 </script>  
-<script type="module" scr="/ai.js"></script>
+<script type="module">
+  import { sanitizeForTTS } from './ai.js';
+
+  // 예시: TTS 호출 전에
+  const clean = sanitizeForTTS("안녕하세요 ###!!!");
+  console.log(clean);
+</script>
 </body>
 </html>
