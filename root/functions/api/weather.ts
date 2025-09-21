@@ -1,101 +1,64 @@
-// /functions/api/weather.ts (Cloudflare Pages Functions)
-export const onRequestGet: PagesFunction<{
-  KMA_KEY: string;
-}> = async ({ request, env }) => {
+// /functions/api/weather.ts
+export const onRequestGet: PagesFunction<{ KMA_KEY: string }> = async ({ request, env }) => {
   try {
     const { searchParams } = new URL(request.url);
-    const nx = searchParams.get('nx') || '60';
+    const nx = searchParams.get('nx') || '60';   // 논산 기본
     const ny = searchParams.get('ny') || '127';
     const type = (searchParams.get('type') || 'JSON').toUpperCase();
 
-    // 1) 기상청 발표 시각(3시간 간격) 자동 보정
     const now = new Date();
-    // KMA 발표는 02,05,08,11,14,17,20,23 시 정각 기준
-    const candidates = [23, 20, 17, 14, 11, 8, 5, 2];
-    let baseDate = formatDateYYYYMMDD(now);
-    let baseTime = pickLatestBaseTime(now.getHours(), candidates);
+    const base = pickBase(now);
+    let base_date = fmtDate(base.date);
+    let base_time = base.time.replace(':', '').padStart(4, '0');
 
-    // 자정 직후(00~01시)는 전날 23:00으로 내려가야 함
-    if (baseTime === '23:00' && now.getHours() < 2) {
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      baseDate = formatDateYYYYMMDD(yesterday);
-    }
-
-    const base_date = baseDate.replace(/-/g, '');
-    const base_time = baseTime.replace(':', '').padStart(4, '0'); // "0500" 형식
-
-    const url = new URL('https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst');
+    const url = new URL(
+      'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst
+'
+    );
     url.searchParams.set('serviceKey', env.KMA_KEY);
     url.searchParams.set('numOfRows', '1000');
     url.searchParams.set('pageNo', '1');
-    url.searchParams.set('dataType', type);  // JSON
+    url.searchParams.set('dataType', type);
     url.searchParams.set('base_date', base_date);
     url.searchParams.set('base_time', base_time);
-    url.searchParams.set('nx', String(nx));
-    url.searchParams.set('ny', String(ny));
+    url.searchParams.set('nx', nx);
+    url.searchParams.set('ny', ny);
 
     const r = await fetch(url.toString
 ());
-    if (!r.ok) {
-      return json({ ok: false, reason: 'HTTP_' + r.status, url: url.toString
-() }, 502);
-    }
+    if (!r.ok) return j({ ok: false, reason: 'HTTP_' + r.status }, 502);
     const data = await r.json();
+    const items = data?.response?.body?.items?.item
+ ?? [];
+    if (!Array.isArray(items) || items.length === 0)
+      return j({ ok: false, reason: 'EMPTY', base_date, base_time }, 200);
 
-    // 응답 구조 방어
-    const items =
-      data?.response?.body?.items?.item
- ||
-      data?.response?.body?.items ||
-      data?.response?.body ||
-      [];
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return json({ ok: false, reason: 'EMPTY', base_date, base_time, url: url.toString
-() }, 200);
-    }
-
-    // 간단 요약(기온/강수/하늘상태)
-    const summary = summarizeKma(items);
-    return json({ ok: true, base_date, base_time, ...summary });
+    const s = summarize(items);
+    return j({ ok: true, base_date, base_time, ...s });
   } catch (e: any) {
-    return json({ ok: false, reason: 'EXCEPTION', detail: String(e?.message || e) }, 500);
+    return j({ ok: false, reason: 'EXCEPTION', detail: String(e?.message || e) }, 500);
   }
 };
 
-function formatDateYYYYMMDD(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}${m}${day}`;
+function pickBase(now: Date) {
+  // 발표시각 02,05,08,11,14,17,20,23
+  const cand = [23, 20, 17, 14, 11, 8, 5, 2];
+  const h = now.getHours();
+  for (const x of cand) if (h >= x) return { date: now, time: `${pad2(x)}:00` };
+  // 0~1시는 전날 23:00
+  const y = new Date(now.getTime() - 86400000);
+  return { date: y, time: '23:00' };
 }
-
-// 현재 시(hour) 기준으로 직전(또는 같은) 발표시각 선택
-function pickLatestBaseTime(currHour: number, cands: number[]) {
-  for (const h of cands) {
-    if (currHour >= h) return `${String(h).padStart(2, '0')}:00`;
-  }
-  return '23:00'; // 새벽 0~1시는 전날 23시
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+function fmtDate(d: Date) {
+  return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`;
 }
-
-function summarizeKma(items: any[]) {
-  // 기온(T1H), 강수형태(PTY), 하늘상태(SKY)
+function summarize(items: any[]) {
   const pick = (cat: string) => items.find((it) => it.category === cat)?.fcstValue;
-
-  const t1h = pick('T1H'); // °C
-  const pty = pick('PTY'); // 0없음 1비 2비/눈 3눈 4소나기 5빗방울 6빗방울눈날림 7눈날림
-  const sky = pick('SKY'); // 1맑음 3구름많음 4흐림
-
-  return {
-    tempC: t1h ? Number(t1h) : null,
-    pty: pty ?? null,
-    sky: sky ?? null,
-  };
+  const tempC = pick('T1H'); const pty = pick('PTY'); const sky = pick('SKY');
+  return { tempC: tempC ? Number(tempC) : null, pty: pty ?? null, sky: sky ?? null };
+}
+function j(data: any, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-function json(data: any, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  });
-}
