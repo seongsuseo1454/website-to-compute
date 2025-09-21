@@ -44,3 +44,31 @@ button.mic.big{font-size:20px;padding:10px 12px}
   .hero h1{font-size:28px}
   .clock{font-size:32px}
 }
+
+/* 마이크 크게 */
+.mic-lg {
+  font-size: 28px;
+  width: 56px; height: 56px;
+  border-radius: 14px;
+}
+
+/* 통역 UI */
+.lang-row { display:flex; gap:12px; align-items:end; }
+.lang-row > div { flex:1; }
+.lang-row .right { flex:0 0 auto; display:flex; gap:8px; }
+
+.trans-box { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px; }
+.bubble { background:rgba(255,255,255,0.04); padding:10px 12px; border-radius:10px; min-height:48px; }
+.bubble.strong { font-weight:600; font-size:1.05rem; }
+@media (max-width:720px){ .trans-box{ grid-template-columns:1fr; } }
+
+.bullet-list { list-style:none; padding:0; margin:8px 0 0 0; display:flex; flex-direction:column; gap:10px; }
+.bullet-list li { padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.04); }
+.bullet-list li.empty { text-align:center; opacity:.7; }
+.bullet-list .title { font-weight:700; line-height:1.3; }
+.bullet-list .meta { font-size:.85rem; opacity:.8; margin-top:2px; }
+.bullet-list .desc { margin-top:6px; opacity:.9; }
+.bullet-list li.clickable { cursor:pointer; }
+.row.gap8 > * + * { margin-left:8px; }
+.small { font-size:.85rem; }
+.muted { opacity:.7; }
