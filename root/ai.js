@@ -1,107 +1,40 @@
-// ai.js  (type="module")
-/* ===== 셀렉터 ===== */
-const $ = (s) => document.querySelector(s);
-const chat   = $('#chat');
-const input  = $('#msgInput');
-const form   = $('#chatForm');
-const micBtn = $('#micBtn');
-
-const ttsToggle = $('#ttsToggle');
-const ttsPause  = $('#ttsPause');
-const ttsResume = $('#ttsResume');
-const ttsStop   = $('#ttsStop');
-
-/* ===== 채팅 UI ===== */
-function pushMsg(role, text){
-  const div = document.createElement('div');
-  div.className = role === 'user' ? 'user' : 'bot';
-  div.textContent = text;
-  chat.appendChild
-(div);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-/* ===== TTS 정리 ===== */
-export function sanitizeForTTS(input){
-  let s = String(input ?? '');
-  // URL 제거
-  s = s.replace(/https?:\/\/\S+/g, ' ');
-  // 마크다운/특수 문자 제거
-  s = s.replace(/[\*\_\`\~\^\#\<\>\|\:\\\/\[\]\{\}\-\+\=\(\)]+/g, ' ');
-  // 이모지 제거 (지원 브라우저만)
-  try { s = s.replace(/\p{Extended_Pictographic}/gu, ' '); } catch {}
-  // 제어문자 제거
-  s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
-  // 공백 정리
-  return s.replace(/\s{2,}/g, ' ').trim();
-}
-
-/* ===== TTS ===== */
-function speak(text){
-  if(!ttsToggle.checked) return;
-  const line = sanitizeForTTS(text);
-  if(!line) return;
-  speechSynthesis.cancel
-();
-  const u = new SpeechSynthesisUtterance(line);
-  u.lang = 'ko-KR'; u.rate=1.0; u.pitch=1.0;
-  speechSynthesis.speak(u);
-}
-ttsPause.onclick  = ()=> speechSynthesis.pause();
-ttsResume.onclick = ()=> speechSynthesis.resume();
-ttsStop.onclick   = ()=> speechSynthesis.cancel
-();
-
-/* ===== STT (webkitSpeechRecognition) ===== */
+/* ===== STT (보다 견고하게) ===== */
 let rec;
-if('webkitSpeechRecognition' in window){
-  const R = window.webkitSpeechRecognition;
-  rec = new R();
-  rec.lang='ko-KR'; rec.continuous
-=false; rec.interimResults
-=false;
-  rec.onresult = (e)=>{
-    const txt = e.results[0][0].transcript;
-    input.value = txt;
-    form.dispatchEvent(new Event('submit',{cancelable:true}));
-  };
-  rec.onerror = ()=> alert('음성 인식 오류입니다. 다시 시도해 주세요.');
-}else{
-  micBtn.disabled = true;
-  micBtn.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
-}
-micBtn.onclick = ()=> { try{ rec && rec.start(); }catch{} };
 
-/* ===== AI 호출 ===== */
-async function callAI(prompt){
-  // Cloudflare Pages Functions: /api/ai (env.GEMINI_API_KEY 사용)
-  const res = await fetch('/api/ai', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ prompt })
-  });
-  if(!res.ok) throw new Error('AI_HTTP_'+res.status);
-  const data = await res.json();
-  return data.text || data.reply || JSON.stringify(data);
+async function ensureMicPermission() {
+  // 일부 환경에서 Recognition 시작 전에 권한 프롬프트가 안 뜨는 경우가 있어 선요청
+  try { await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { /* 사용자가 취소할 수도 있음 */ }
 }
 
-/* ===== 전송 처리 ===== */
-form.addEventListener
-('submit', async (e)=>{
-  e.preventDefault();
-  const q = input.value.trim();
-  if(!q) return;
-  input.value='';
-  pushMsg('user', q);
-  try{
-    const a = await callAI(q);
-    pushMsg('bot', a);
-    speak(a);
-  }catch(err){
-    const msg = '에러가 발생했습니다. 곧 조치하겠습니다.';
-    pushMsg('bot', msg);
-    speak(msg);
-    // 필요 시 원격 리포트 훅 연결
-    // fetch('/api/report', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'AI_FAIL',detail:String(err)})})
+function initSTT() {
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!R) {
+    micBtn.disabled = true;
+    micBtn.title = '이 브라우저는 음성 입력(STT)을 지원하지 않습니다. Chrome/Edge를 사용하세요.';
+    return;
   }
-});
+  rec = new R();
+  rec.lang = 'ko-KR';
+  rec.continuous = false;
+  rec.interimResults = false;
+
+  rec.onresult = (e) => {
+    const txt = e.results?.[0]?.[0]?.transcript || '';
+    if (txt) {
+      input.value = txt;
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  };
+  rec.onerror = (ev) => {
+    alert('음성 인식 오류: ' + (ev?.error || '알 수 없음') + '\n마이크 권한/네트워크를 확인하세요.');
+  };
+
+  micBtn.onclick = async () => {
+    try {
+      await ensureMicPermission();
+      rec.start();
+    } catch (_) {}
+  };
+}
+
+initSTT();
