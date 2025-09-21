@@ -24,40 +24,37 @@
     <div class="clock" id="clock">--:--</div>
   </section>
 
-  <!-- 현재 날씨 (모바일 우선, 좌표 문구 제거) -->
+  <!-- 현재 날씨 -->
   <section class="card">
-    <div class="card-head">
-      <h2 class="card-title">현재 날씨</h2>
-      <button id="btnWeather" class="btn ghost">날씨 업데이트</button>
+    <header class="card-title">현재 날씨</header>
+    <p id="weatherLoc" class="muted">지역 확인 중…</p>
+    <div class="weather-grid">
+      <div>온도: <strong id="temp">로딩 중</strong></div>
+      <div>습도: <strong id="hum">로딩 중</strong></div>
+      <div>강수: <strong id="rain">–</strong></div>
+      <div>풍속: <strong id="wind">로딩 중</strong></div>
     </div>
-
-    <!-- 내부 진단용 source만 보관, 화면표시는 숨김 -->
-    <p id="weatherMeta" class="meta" hidden></p>
-
-    <div class="kv-grid">
-      <div class="kv"><span class="k">온도</span><span class="v"><span id="temp">-</span>°C</span></div>
-      <div class="kv"><span class="k">습도</span><span class="v"><span id="hum">-</span>%</span></div>
-      <div class="kv"><span class="k">강수</span><span class="v"><span id="rain">-</span></span></div>
-      <div class="kv"><span class="k">풍속</span><span class="v"><span id="wind">-</span> m/s</span></div>
+    <div class="row-right">
+      <button id="btnWeather" class="ghost">날씨 업데이트</button>
     </div>
   </section>
 
   <!-- AI 비서 (채팅 + 음성) -->
   <section class="card">
-    <h2 class="card-title">AI 비서 채팅</h2>
+    <header class="card-title">AI 비서 채팅</header>
 
     <div id="chat" class="chat">
       <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
     </div>
 
     <form id="chatForm" class="chat-form">
-      <button type="button" id="micBtn" title="음성으로 말하기" class="ghost mic">🎤</button>
+      <button type="button" id="micBtn" title="음성으로 말하기" class="ghost">🎤</button>
       <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
       <button type="submit" class="primary">보내기</button>
     </form>
 
     <div class="tts-row">
-      <label class="ck"><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
+      <label><input type="checkbox" id="ttsToggle" checked /> 응답을 음성으로 읽기</label>
       <div class="spacer"></div>
       <button id="ttsPause" class="ghost">⏸︎ 일시정지</button>
       <button id="ttsResume" class="ghost">▶︎ 재개</button>
@@ -67,128 +64,21 @@
     <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
   </section>
 
+  <!-- 바닥 표시 -->
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
 
-<!-- 비서 로직 -->
-<script type="module">
-  // ---- 공통 셀렉터
-  const $ = (s) => document.querySelector(s);
-
-  // ---- 시계/날짜
-  function tick() {
-    const now = new Date();
-    $('#clock').textContent = now.toLocaleTimeString
-('ko-KR', { hour: '2-digit', minute: '2-digit' });
-    $('#today').textContent = now.toLocaleDateString
-('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', weekday:'long' });
-  }
-  setInterval(tick, 1000); tick();
-
-  // ---- 채팅 UI
-  const chat = $('#chat');
-  const form = $('#chatForm');
-  const input = $('#msgInput');
-  const micBtn = $('#micBtn');
-
-  function pushMsg(role, text) {
-    const div = document.createElement('div');
-    div.className = role === 'user' ? 'user' : 'bot';
-    div.textContent = text;
-    chat.appendChild
-(div);
-    chat.scrollTop = chat.scrollHeight;
-  }
-
-  // ---- 음성 합성(TTS) (특수문자 자동 정리)
-  const ttsToggle = $('#ttsToggle');
-  const ttsPause  = $('#ttsPause');
-  const ttsResume = $('#ttsResume');
-  const ttsStop   = $('#ttsStop');
-
-  function sanitizeForTTS(s) {
-    s = String(s ?? '');
-    s = s.replace(/https?:\/\/\S+/g, ' ');
-    s = s.replace(/[\*\_\`\~\^\#\>\<\|\:\\\/\[\]\{\}\-]+/g, ' ');
-    try { s = s.replace(/\p{Extended_Pictographic}/gu, ''); } catch {}
-    s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
-    return s.replace(/\s{2,}/g, ' ').trim();
-  }
-  function speak(text) {
-    if (!ttsToggle.checked) return;
-    const line = sanitizeForTTS(text);
-    if (!line) return;
-    speechSynthesis.cancel
-();
-    const u = new SpeechSynthesisUtterance(line);
-    u.lang = 'ko-KR'; u.rate = 1; u.pitch = 1;
-    speechSynthesis.speak(u);
-  }
-  ttsPause.onclick  = () => speechSynthesis.pause();
-  ttsResume.onclick = () => speechSynthesis.resume();
-  ttsStop.onclick   = () => speechSynthesis.cancel
-();
-
-  // ---- 음성 입력(STT)
-  let rec;
-  if ('webkitSpeechRecognition' in window) {
-    const R = window.webkitSpeechRecognition;
-    rec = new R(); rec.lang = 'ko-KR'; rec.continuous
- = false; rec.interimResults
- = false;
-    rec.onresult = (e) => {
-      input.value = e.results[0][0].transcript;
-      form.requestSubmit();
-    };
-  } else {
-    micBtn.disabled = true;
-    micBtn.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
-  }
-  micBtn.onclick = () => { try { rec && rec.start(); } catch {} };
-
-  // ---- AI 호출(있으면 askAI, 없으면 /api/ai)
-  async function callAI(prompt) {
-    if (typeof window.askAI === 'function') return await window.askAI(prompt);
-    const r = await fetch('/api/ai', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt }) });
-    if (!r.ok) throw new Error('AI 오류 ' + r.status);
-    const j = await r.json();
-    return j.text || j.reply || JSON.stringify(j);
-  }
-
-  form.addEventListener
-('submit', async (e) => {
-    e.preventDefault();
-    const q = input.value.trim(); if (!q) return;
-    input.value = ''; pushMsg('user', q);
-    try {
-      const a = await callAI(q);
-      pushMsg('bot', a); speak(a);
-    } catch {
-      const msg = '에러가 발생했습니다. 곧 조치하겠습니다.';
-      pushMsg('bot', msg); speak(msg);
-    }
-  });
-
-  // ---- 날씨 갱신(/api/weather: {temp,humidity,wind,rain,source})
-  async function refreshWeather() {
-    try {
-      const r = await fetch('/api/weather');
-      if (!r.ok) throw new Error('HTTP '+r.status);
-      const d = await r.json();
-      $('#temp').textContent = d.temp ?? '-';
-      $('#hum').textContent  = d.humidity ?? '-';
-      $('#wind').textContent = d.wind ?? '-';
-      $('#rain').textContent = d.rain ?? '-';
-      if (d.source) { const m = $('#weatherMeta'); m.textContent = d.source; m.hidden = true; }
-    } catch {
-      // 값이 없으면 그대로 '-' 유지
-    }
-  }
-  $('#btnWeather').onclick = refreshWeather;
-  refreshWeather();
+<!-- 에러/거부 자동 표기 -->
+<style>
+  .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
+</style>
+<div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
+<script>
+  addEventListener('error',()=>{ document.getElementById('errorBadge').style.display='block';});
+  addEventListener('unhandledrejection',()=>{ document.getElementById('errorBadge').style.display='block';});
 </script>
 
-<!-- (선택) ai.js가 있으면 자동 로드 -->
-<script src="/ai.js" defer></script>
+<!-- 비서/날씨 로직 -->
+<script src="/ai.js?v=2025-09-21-01"></script>
 </body>
 </html>
