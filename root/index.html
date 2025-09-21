@@ -11,34 +11,7 @@
   <link rel="icon" sizes="512x512" href="/icon-512.png" />
   <meta name="theme-color" content="#0b0f19" />
 
-  <!-- 선택: 기존 style.css 유지 -->
   <link rel="stylesheet" href="/style.css" />
-  <style>
-    /* 최소한의 기본 스타일 (style.css 없을 경우 대비) */
-    body{margin:0;background:#0b0f19;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif}
-    .container{max-width:1100px;margin:0 auto;padding:24px}
-    .hero{display:flex;align-items:end;justify-content:space-between;margin:8px 0 20px}
-    .hero h1{margin:.2rem 0;font-size:28px}
-    .sub{opacity:.8;margin:0}
-    .clock{font-size:40px;font-weight:700}
-    .card{background:rgba(255,255,255,.08);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.15);
-          border-radius:16px;padding:16px}
-    .card-title{font-weight:700;margin-bottom:10px}
-    .chat{display:flex;flex-direction:column;gap:8px;max-height:42vh;overflow:auto;padding:8px;background:rgba(0,0,0,.2);
-          border-radius:12px}
-    .chat .user{align-self:flex-end;background:#2d6cdf;color:#fff;padding:10px 12px;border-radius:14px 14px 2px 14px;max-width:80%}
-    .chat .bot{align-self:flex-start;background:#1c2333;color:#e9ecf4;padding:10px 12px;border-radius:14px 14px 14px 2px;max-width:80%}
-    .chat-form{display:flex;gap:8px;margin-top:10px}
-    .chat-form input{flex:1;padding:12px;border-radius:10px;border:1px solid #3a4361;background:#0f1525;color:#e9ecf4}
-    .primary{background:#2d6cdf;color:#fff;border:0;padding:12px 16px;border-radius:10px;cursor:pointer}
-    .ghost{background:transparent;color:#cdd5ff;border:1px solid #3a4361;padding:10px 12px;border-radius:10px;cursor:pointer}
-    .danger{color:#ff9ea0;border-color:#6b1e25}
-    .tts-row{display:flex;align-items:center;gap:10px;margin-top:8px}
-    .spacer{flex:1}
-    .footer{opacity:.6;margin-top:20px;text-align:center}
-    .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;
-                 font-size:12px;display:none;z-index:9999}
-  </style>
 </head>
 <body>
 <main class="container">
@@ -51,6 +24,50 @@
     <div class="clock" id="clock">--:--</div>
   </section>
 
+  <!-- 현재 건강·업무 요약 -->
+  <section class="grid">
+    <div class="card">
+      <header class="card-title">오늘 핵심 지표</header>
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-v" id="step">8,420</div><div class="kpi-n">걸음수</div></div>
+        <div class="kpi"><div class="kpi-v" id="sleep">7.2h</div><div class="kpi-n">수면</div></div>
+        <div class="kpi"><div class="kpi-v" id="hr">68</div><div class="kpi-n">심박수</div></div>
+      </div>
+      <p class="hint">* 실 장비 미연결 상태 – 데모 값 표시</p>
+    </div>
+
+    <div class="card">
+      <header class="card-title">날씨 & 특보</header>
+      <div class="weather">
+        <div class="now">
+          <div class="temp" id="temp">--°C</div>
+          <div class="meta">
+            <div>습도 <span id="hum">-%</span></div>
+            <div>풍속 <span id="wind">- m/s</span></div>
+          </div>
+        </div>
+        <div class="tools">
+          <button id="wxRefresh" class="ghost">날씨 업데이트</button>
+        </div>
+      </div>
+      <div class="badges">
+        <button class="badge ghost">날씨 새로고침</button>
+        <button class="badge ghost">태풍 특보(데모)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 오늘 일정 요약 -->
+  <section class="card">
+    <header class="card-title">오늘 일정 요약</header>
+    <ul class="agenda" id="agenda">
+      <li><span class="t">10:00</span> 간부 회의 <span class="loc">본관 3층 상황실</span></li>
+      <li><span class="t">14:00</span> 지역 기업 대표 면담 <span class="loc">시장 집무실</span></li>
+      <li><span class="t">17:00</span> 청소년 진로 간담회 <span class="loc">시립도서관</span></li>
+    </ul>
+    <div class="tools"><button class="ghost">새로고침</button></div>
+  </section>
+
   <!-- AI 비서 (채팅 + 음성) -->
   <section class="card">
     <header class="card-title">AI 비서 (채팅 + 음성)</header>
@@ -59,9 +76,9 @@
       <div class="bot">안녕하세요, 시장님. 무엇을 도와드릴까요?</div>
     </div>
 
-    <form id="chatForm" class="chat-form" autocomplete="off">
+    <form id="chatForm" class="chat-form">
       <button type="button" id="micBtn" title="음성으로 말하기" class="ghost">🎤</button>
-      <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" />
+      <input id="msgInput" type="text" placeholder="메시지를 입력하세요. (예: 오늘 일정 요약)" autocomplete="off" />
       <button type="submit" class="primary">보내기</button>
     </form>
 
@@ -73,119 +90,67 @@
       <button id="ttsStop" class="danger ghost">■ 정지</button>
     </div>
 
-    <p class="sub" style="margin-top:6px;opacity:.75">
-      ※ 특수문자/이모지/마크다운은 자동 정리 후 읽습니다.
-    </p>
+    <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
   </section>
 
+  <!-- 바닥 표시 -->
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
 
 <!-- 에러 배지 -->
+<style>.error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}</style>
 <div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
 
-<!-- 앱 스크립트 (모듈) -->
-<script type="module">
-  import { sanitizeForTTS, askAI, reportClientError } from './ai.js';
-
-  // ===== DOM 참조 =====
-  const $      = (s) => document.querySelector(s);
-  const chat   = $('#chat');
-  const form   = $('#chatForm');
-  const input  = $('#msgInput');
-  const micBtn = $('#micBtn');
-  const ttsOn  = $('#ttsToggle');
-  const ttsPause  = $('#ttsPause');
-  const ttsResume = $('#ttsResume');
-  const ttsStop   = $('#ttsStop');
-
-  // ===== 시계/날짜 =====
-  function tick() {
-    const now = new Date();
+<!-- 앱 스크립트 -->
+<script type="module" src="/ai.js"></script>
+<script>
+  // 인사/시계
+  const $ = (s)=>document.querySelector(s);
+  function tick(){
+    const now=new Date();
     $('#clock').textContent = now.toLocaleTimeString
 ('ko-KR',{hour:'2-digit',minute:'2-digit'});
     $('#today').textContent = now.toLocaleDateString
 ('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'long'});
   }
-  setInterval(tick,1000); tick();
+  tick(); setInterval(tick,1000);
 
-  // ===== 채팅 UI =====
-  function pushMsg(role, text) {
-    const div = document.createElement('div');
-    div.className = role === 'user' ? 'user' : 'bot';
-    div.textContent = text;
-    chat.appendChild
-(div);
-    chat.scrollTop = chat.scrollHeight;
-  }
+  // 간단 날씨 데모 + 업데이트 버튼
+  const NX = 60, NY = 127; // 필요 시 기상청 격자 좌표로 교체
+  async function refreshWeather(){
+    try{
+      const date=new Date();
+      const d = date.toISOString
+().slice(0,10).replace(/-/g,'');
+      const t = String(date.getHours()).padStart(2,'0')+'00';
+      const res = await fetch(`/api/weather?nx=${NX}&ny=${NY}&date=${d}&time=${t}&type=JSON`);
+      if(!res.ok) throw new Error('WEATHER_API_FAIL');
+      const data = await res.json();
 
-  // ===== TTS 제어 =====
-  function speak(text) {
-    if (!ttsOn.checked) return;
-    const clean = sanitizeForTTS(text);
-    if (!clean) return;
-    window.speechSynthesis.cancel
-();
-    const u = new SpeechSynthesisUtterance(clean);
-    u.lang = 'ko-KR';
-    u.rate = 1.0;
-    u.pitch = 1.0;
-    window.speechSynthesis.speak(u);
-  }
-  ttsPause.onclick  = () => window.speechSynthesis.pause();
-  ttsResume.onclick = () => window.speechSynthesis.resume();
-  ttsStop.onclick   = () => window.speechSynthesis.cancel
-();
+      // 데이터 구조에 맞춰 가공 (실패 시 데모 유지)
+      const temp = data?.temp ?? 26;
+      const hum  = data?.humidity ?? 58;
+      const wind = data?.wind ?? 1.8;
 
-  // ===== STT(음성 인식) =====
-  let rec;
-  if ('webkitSpeechRecognition' in window) {
-    rec = new webkitSpeechRecognition();
-    rec.lang = 'ko-KR';
-    rec.continuous
- = false;
-    rec.interimResults
- = false;
-    rec.onresult = (e) => {
-      input.value = e.results[0][0].transcript;
-      form.dispatchEvent(new Event('submit', { cancelable: true }));
-    };
-    rec.onerror = () => alert('음성 인식 오류가 발생했습니다. 다시 시도해 주세요.');
-  } else {
-    micBtn.disabled = true;
-    micBtn.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
-  }
-  micBtn.onclick = () => { try { rec && rec.start(); } catch(_) {} };
-
-  // ===== 전송 처리 =====
-  form.addEventListener
-('submit', async (e) => {
-    e.preventDefault();
-    const q = input.value.trim();
-    if (!q) return;
-    input.value = '';
-    pushMsg('user', q);
-
-    try {
-      const a = await askAI(q);   // <-- ai.js 호출
-      pushMsg('bot', a);
-      speak(a);
-    } catch (err) {
-      const msg = '에러가 발생했습니다. 곧 조치하겠습니다.';
-      pushMsg('bot', msg);
-      speak(msg);
-      reportClientError({ type:'ai', message:String(err) }).catch(()=>{});
-      // 필요하면: await fetch('/api/alert', {method:'POST',body:JSON.stringify({...})})
+      $('#temp').textContent = `${temp}°C`;
+      $('#hum').textContent = `${hum}%`;
+      $('#wind').textContent = `${wind} m/s`;
+    }catch(e){
+      // 데모 값 유지
+      $('#temp').textContent = '26°C';
+      $('#hum').textContent = '58%';
+      $('#wind').textContent = '1.8 m/s';
     }
-  });
+  }
+  refreshWeather();
+  $('#wxRefresh').addEventListener('click', refreshWeather);
 
-  // ===== 전역 에러 뱃지 =====
+  // 전역 에러 배지
   const badge = document.getElementById('errorBadge');
-  function showBadge(){ badge.style.display='block'; }
   window.addEventListener
-('error', () => { showBadge(); reportClientError({type:'error'}); });
+('error', ()=>badge.style.display='block');
   window.addEventListener
-('unhandledrejection', () => { showBadge(); reportClientError({type:'unhandledrejection'}); });
+('unhandledrejection', ()=>badge.style.display='block');
 </script>
 </body>
 </html>
