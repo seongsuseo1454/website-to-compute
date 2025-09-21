@@ -152,6 +152,57 @@
   }
   setInterval(tick, 1000); tick();
 </script>
+<script>
+async function getGrid() {
+  // 간단: 권한 없거나 실패하면 논산(60,127)로 폴백
+  try {
+    const pos = await new Promise<GeolocationPosition>((res, rej) =>
+      navigator.geolocation.getCurrentPosition(res, rej, { timeout: 3000 })
+    );
+    const { latitude, longitude } = pos.coords
+;
+    // 위경도를 KMA 격자(nx, ny)로 변환(간략 근사치 또는 고정값 사용)
+    return { nx: 60, ny: 127 }; // TODO: 필요시 위경→격자 변환로직 삽입
+  } catch {
+    return { nx: 60, ny: 127 };
+  }
+}
+
+async function refreshWeather() {
+  try {
+    const { nx, ny } = await getGrid();
+    const r = await fetch(`/api/weather?nx=${nx}&ny=${ny}&type=JSON`);
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.reason || 'KMA_FAIL');
+
+    const tempEl = document.querySelector('#temp');
+    const skyEl  = document.querySelector('#sky');
+    const ptyEl  = document.querySelector('#pty');
+
+    if (tempEl) tempEl.textContent = (data.tempC ?? '-') + '℃';
+    if (skyEl)  skyEl.textContent  = skyText(data.sky);
+    if (ptyEl)  ptyEl.textContent  = ptyText(data.pty);
+  } catch (e) {
+    // UI에 조용히 표시 (배지/로그)
+    console.warn('Weather error:', e);
+  }
+}
+
+function skyText(v) {
+  if (v == 1) return '맑음';
+  if (v == 3) return '구름 많음';
+  if (v == 4) return '흐림';
+  return '-';
+}
+function ptyText(v) {
+  const map = { 0:'없음',1:'비',2:'비/눈',3:'눈',4:'소나기',5:'빗방울',6:'빗방울/눈날림',7:'눈날림' };
+  return map[v] ?? '-';
+}
+
+// 페이지 로드 시 & 10분마다 갱신
+refreshWeather();
+setInterval(refreshWeather, 10 * 60 * 1000);
+</script>  
 <script type="module" src="/ai.js">  
 </body>
 </html>
