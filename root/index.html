@@ -205,34 +205,45 @@ function pushMsg(role, text){
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 }
+  
+let rec; // webkitSpeechRecognition
 
-/* ===== TTS ===== */
-function speak(text){
-  if(!ttsToggle.checked) return;
-  const line = window.sanitizeForTTS ? window.sanitizeForTTS(text): text;
-  if(!line) return;
-  window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(line);
-  u.lang='ko-KR'; u.rate=1.0; u.pitch=1.0;
-  window.speechSynthesis.speak(u);
+function sttInit(){
+  if (!('webkitSpeechRecognition' in window)) return;
+  const R = window.webkitSpeechRecognition;
+  rec = new R();
+  rec.lang = voiceLang(trSrc.value);  // 입력 언어에 맞춰 인식 언어도 변경
+  rec.continuous = false;
+  rec.interimResults = false;
+
+  rec.onresult = (e)=>{
+    const txt = (e.results?.[0]?.[0]?.transcript || '').trim();
+    if (!txt) return;
+    trIn.value = txt;        // 화면에도 한 번 보여주고
+    doTranslate(txt);        // ✅ 즉시 번역 + 자동 읽기
+  };
+  rec.onerror = ()=>{ trOut.value = '오류: 음성 인식 실패'; };
 }
-ttsPause.onclick=()=>window.speechSynthesis.pause();
-ttsResume.onclick=()=>window.speechSynthesis.resume();
-ttsStop.onclick=()=>window.speechSynthesis.cancel();
 
-/* ===== STT (채팅용) ===== */
-let rec;
-if('webkitSpeechRecognition' in window){
-  const R=window.webkitSpeechRecognition; rec=new R();
-  rec.lang='ko-KR'; rec.continuous=false; rec.interimResults=false;
-  rec.onresult=(e)=>{ const txt=e.results[0][0].transcript; input.value=txt;
-    form.dispatchEvent(new Event('submit',{cancelable:true})); };
-  rec.onerror=()=>alert('음성 인식 오류. 다시 시도해 주세요.');
-}else{
-  micBtn.disabled=true; micBtn.title='이 브라우저는 음성 인식을 지원하지 않습니다.';
-}
-micBtn.onclick=()=>{ try{ rec && rec.start(); }catch(_){} };
+// 입력 언어 변경 시 STT 언어도 동기화
+trSrc.addEventListener('change', ()=>{
+  if (rec) rec.lang = voiceLang(trSrc.value);
+});
 
+document.getElementById('trStart').onclick = ()=>{
+  // ✅ 시작할 때 깔끔히 비우기
+  trIn.value = '';
+  trOut.value = '';
+
+  if (!rec) sttInit();
+  try { rec && rec.start(); } catch(e){}
+};
+
+document.getElementById('trStop').onclick = ()=>{
+  try { rec && rec.stop(); } catch(e){}
+  speechSynthesis.cancel();
+};
+  
 /* ===== AI 호출 ===== */
 async function callAI(prompt){
   if(typeof window.askAI==='function') return await window.askAI(prompt);
@@ -486,6 +497,71 @@ window.addEventListener('unhandledrejection',()=>{$('#errorBadge').style.display
   });
 })();
 </script>
+<script>
+// === 통역 유틸: 언어코드 → 음성 언어 매핑 + 말하기 ===
+function voiceLang(code){
+  // select의 값과 맞춘 매핑(필요 시 추가)
+  const map = {
+    ko:'ko-KR', en:'en-US', ja:'ja-JP', zh:'zh-CN', fr:'fr-FR',
+    de:'de-DE', es:'es-ES', pt:'pt-PT', ru:'ru-RU', vi:'vi-VN',
+    th:'th-TH', id:'id-ID', ar:'ar-SA', hi:'hi-IN'
+  };
+  return map[code] || 'en-US';
+}
+
+function speakText(text, langCode){
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = voiceLang(langCode);
+  // 기기마다 남/여/속도 취향 바꾸려면 여기서 rate/pitch만 조절
+  u.rate = 1.0; u.pitch = 1.0;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+// 반복·중복 제거(“你好你好你好” 같은 현상 완화)
+function dedupeRepeat(s){
+  // 동일 문자 3회 이상 → 2회로 축약
+  return s.replace(/(.)\1{2,}/g, '$1$1').replace(/\s{2,}/g, ' ').trim();
+}
+</script>  
+<script>
+const trIn = document.getElementById('trIn');
+const trOut = document.getElementById('trOut');
+const trSrc = document.getElementById('trSrc');
+const trDst = document.getElementById('trDst');
+
+async function doTranslate(text){
+  // 이전 결과/상태 초기화
+  trOut.value = '번역 중…';
+
+  const res = await fetch('/api/translate', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ text, src: trSrc.value, dst: trDst.value })
+  });
+  const j = await res.json().catch(()=>({}));
+
+  if (j.translated){
+    const cleaned = dedupeRepeat(j.translated);
+    trOut.value = cleaned;
+
+    // ✅ 자동 읽기
+    speakText(cleaned, trDst.value);
+
+    // ✅ 입력 칸 자동 정리
+    trIn.value = '';
+  }else{
+    trOut.value = j.error ? `오류: ${j.error}` : '번역 결과 없음';
+  }
+}
+
+// "텍스트 번역" 버튼
+document.getElementById('trTranslate').onclick = ()=>{
+  const txt = trIn.value.trim();
+  if (!txt) return;
+  doTranslate(txt);
+};
+</script>  
 <script src="/ai.js"></script>
 </body>
 </html>
