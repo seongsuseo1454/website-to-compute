@@ -1,75 +1,47 @@
-// functions/api/ai.js
-// Cloudflare Pages Functions - Google Gemini 1.5 Flash 호출 (POST 전용)
+// /functions/api/ai.js
+// Cloudflare Pages Functions (POST /api/ai)
+// -> Google Gemini 1.5 Flash 프록시 (키 없으면 안전한 폴백 메시지)
 
-export async function onRequest(context) {
-  const { request, env } = context;
-
-  // POST 전용
-  if (request.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
+export async function onRequest({ request, env }) {
   try {
-    // 요청 바디 파싱
     const body = await request.json().catch(() => ({}));
     const prompt = body && body.prompt;
     if (!prompt || typeof prompt !== "string") {
-      return new Response(JSON.stringify({ error: "no prompt" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response(JSON.stringify({ error: "no prompt" }), { status: 400 });
     }
 
-    // API 키 확인
     const key = env && env.GEMINI_API_KEY;
     if (!key) {
-      return new Response(
-        JSON.stringify({ text: "AI 키가 설정되지 않았습니다." }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
+      // 폴백(키 미설정 시에도 UI가 죽지 않도록)
+      return new Response(JSON.stringify({ text: "AI 키가 설정되지 않았습니다." }), { status: 200 });
     }
 
-    // URL (문자열 연결만 사용, 백틱 금지)
+    // 백틱 없이 URL 조립 (빌드기 에러 예방)
     const url =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
-      encodeURIComponent(String(key));
+      "https://generativelanguage.googleapis.com/v1beta/models/" +
+      "gemini-1.5-flash:generateContent?key=" +
+      encodeURIComponent(key);
 
-    // Gemini API 호출
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }]
+        contents: [{ role: "user", parts: [{ text: prompt }]}]
       })
     });
 
     if (!res.ok) {
-      return new Response(
-        JSON.stringify({ text: "AI 응답 오류: " + res.status }),
-        { status: 502, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ text: "AI 응답 오류: " + res.status }), { status: 200 });
     }
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json();
     const text =
-      data &&
-      data.candidates &&
-      data.candidates[0] &&
-      data.candidates[0].content &&
-      data.candidates[0].content.parts &&
-      data.candidates[0].content.parts[0] &&
-      data.candidates[0].content.parts[0].text;
-
-    return new Response(JSON.stringify({ text: text || "응답 없음" }), {
-      headers: { "Content-Type": "application/json" }
-    });
+      (data && data.candidates && data.candidates[0] &&
+       data.candidates[0].content && data.candidates[0].content.parts &&
+       data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) ||
+      "응답 없음";
+    return new Response(JSON.stringify({ text }), { status: 200 });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(JSON.stringify({ text: "서버 오류: " + String(e) }), { status: 200 });
   }
 }
