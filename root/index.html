@@ -382,6 +382,110 @@ window.addEventListener('unhandledrejection',()=>{$('#errorBadge').style.display
   });
 })();
 </script>
+<script>
+/* ===== 실시간 통역 바인딩 ===== */
+(function(){
+  const $ = (s)=>document.querySelector(s);
+
+  const srcSel = $('#trSrc');
+  const dstSel = $('#trDst');
+  const btnStart = $('#trStart');
+  const btnStop = $('#trStop');
+  const btnTranslate = $('#trTranslate');
+  const btnSpeak = $('#trSpeak');
+  const inArea = $('#trIn');
+  const outArea = $('#trOut');
+
+  // BCP-47 매핑 (TTS/Speech용)
+  const langVoiceMap = {
+    ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN',
+    fr: 'fr-FR', de: 'de-DE', es: 'es-ES', pt: 'pt-PT',
+    ru: 'ru-RU', vi: 'vi-VN', th: 'th-TH', id: 'id-ID',
+    ar: 'ar-SA', hi: 'hi-IN'
+  };
+
+  // ---- STT(음성 인식: 입력언어) ----
+  let rec = null;
+  if ('webkitSpeechRecognition' in window) {
+    const R = window.webkitSpeechRecognition;
+    rec = new R();
+    rec.continuous = true;   // 길게 말해도 OK
+    rec.interimResults = false;
+
+    rec.onresult = (e) => {
+      // 최신 인식 결과만 사용
+      const r = e.results[e.results.length - 1];
+      if (r && r[0]) {
+        const t = r[0].transcript;
+        inArea.value = (inArea.value ? inArea.value + ' ' : '') + t;
+      }
+    };
+    rec.onerror = () => alert('음성 인식 오류가 발생했습니다. 다시 시도해주세요.');
+    rec.onend = () => { btnStart.disabled = false; btnStop.disabled = true; };
+  } else {
+    btnStart.disabled = true;
+    btnStart.title = '이 브라우저는 음성 인식을 지원하지 않습니다.';
+  }
+
+  btnStart.addEventListener('click', ()=>{
+    if (!rec) return;
+    const code = langVoiceMap[srcSel.value] || 'ko-KR';
+    try {
+      rec.lang = code;
+      rec.start();
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+    } catch(e) {
+      alert('음성 인식을 시작하지 못했습니다: ' + e);
+    }
+  });
+
+  btnStop.addEventListener('click', ()=>{
+    if (!rec) return;
+    try { rec.stop(); } catch(_) {}
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+  });
+
+  // ---- 번역 호출 ----
+  async function doTranslate() {
+    const text = inArea.value.trim();
+    if (!text) { alert('번역할 내용을 말하거나 입력해 주세요.'); return; }
+    const payload = { text, src: srcSel.value, dst: dstSel.value };
+    try {
+      const res = await fetch('/api/translate', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const j = await res.json().catch(()=> ({}));
+      if (j.translated) {
+        outArea.value = j.translated;
+      } else {
+        outArea.value = j.error ? ('오류: ' + j.error) : '번역 결과 없음';
+      }
+    } catch(e) {
+      outArea.value = '네트워크 오류';
+    }
+  }
+  btnTranslate.addEventListener('click', doTranslate);
+
+  // ---- 번역문 읽어주기(TTS) ----
+  btnSpeak.addEventListener('click', ()=>{
+    const t = outArea.value.trim();
+    if (!t) return;
+    const voiceLang = langVoiceMap[dstSel.value] || 'ko-KR';
+    const clean = (window.sanitizeForTTS ? window.sanitizeForTTS(t) : t);
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(clean);
+      u.lang = voiceLang;
+      u.rate = 1.0; u.pitch = 1.0;
+      window.speechSynthesis.speak(u);
+    } catch(_){}
+  });
+})();
+</script>
 <script src="/ai.js"></script>
 </body>
 </html>
