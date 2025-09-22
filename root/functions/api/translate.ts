@@ -24,16 +24,22 @@ export const onRequest: PagesFunction = async (ctx) => {
     ].join('\n');
 
    const resp = await fetch(
-   `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`,
-   {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({
+     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
-     }),
-   }
- );
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 512,
+      },
+    }),
+  }
+);
+
 
     if (!resp.ok) {
       const t = await resp.text().catch(() => '');
