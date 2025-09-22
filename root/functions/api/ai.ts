@@ -17,9 +17,7 @@ export async function onRequest({ request, env }: { request: Request; env: any }
 
     // 3) Google Gemini 호출 (백틱/줄바꿈/템플릿 제거: 안전한 문자열 결합)
     const url =
-      'https://generativelanguage.googleapis.com/v1beta/models/' +
-      'gemini-1.5-flash:generateContent?key=' +
-      encodeURIComponent(key);
+      'https://generativelanguage.googleapis.com/v1beta/models/' + 'gemini-1.5-flash:generateContent?key=' + encodeURIComponent(key);
 
     const res = await fetch(url, {
       method: 'POST',
