@@ -1,47 +1,47 @@
 // functions/api/ai.ts
 // AI 비서용 API 엔드포인트 (Gemini API 연동)
-export const onRequest: PagesFunction = async ({ request, env }) => {
+
+export async function onRequest({ request, env }: { request: Request; env: any }) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const prompt = body?.prompt;
-    if (!prompt) return json({ error: 'no prompt' }, 400);
-
-    const key = env?.GEMINI_API_KEY;
-    if (!key) return json({ text: 'AI 키가 설정되지 않았습니다.' }, 500);
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(
-        key
-      )}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: String(prompt) }] }], // role 생략해도 OK
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      return json({ text: 'AI 응답 오류 · 상태코드 ' + res.status, detail }, res.status);
+    // 1. 프롬프트 파싱
+    const { prompt } = await request.json();
+    if (!prompt) {
+      return new Response(JSON.stringify({ error: 'no prompt' }), { status: 400 });
     }
 
-    const data = await res.json();
-    const parts = data?.candidates?.[0]?.content?.parts;
-    const text = Array.isArray(parts)
-      ? parts.map((p: any) => p?.text).filter(Boolean).join('\n')
-      : '응답 없음';
+    // 2. API 키 확인
+    const key = env.GEMINI_API_KEY;
+    if (!key) {
+      return Response.json({ text: 'AI 키가 설정되지 않았습니다.' }, { status: 500 });
+    }
 
-    return json({ text });
-  } catch (e: any) {
-    return json({ error: String(e?.message || e) }, 500);
-  }
-};
-
-function json(body: any, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
+   const res = await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`,
+  {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-  });
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }]
+        }
+      ]
+    })
+  }
+);
+
+
+    if (!res.ok) {
+      return Response.json({ text: 'AI 응답 오류 · 상태코드 ' + res.status }, { status: res.status });
+    }
+
+    // 4. 결과 파싱
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '응답 없음';
+
+    return Response.json({ text });
+  } catch (e: any) {
+    return Response.json({ error: String(e) }, { status: 500 });
+  }
 }
