@@ -1,7 +1,8 @@
 // /functions/api/translate.ts — FINAL (Cloudflare Pages Functions, 14언어)
 export const onRequest: PagesFunction = async (ctx) => {
   try {
-    if (ctx.request.method !== 'POST') {
+    if (ctx.request.method
+ !== 'POST') {
       return new Response(JSON.stringify({ error: 'POST only' }), { status: 405 });
     }
     const { q, source, target } = await ctx.request.json<any>();
@@ -9,7 +10,9 @@ export const onRequest: PagesFunction = async (ctx) => {
       return new Response(JSON.stringify({ error: 'missing q/target' }), { status: 400 });
     }
 
-    const key = ctx.env?.GOOGLE_API_KEY || (await ctx.env?.AI_STUDIO_API_KEY);
+    const key = ctx.env?.GOOGLE_API_KEY
+ || (await ctx.env?.AI_STUDIO_API_KEY
+);
     if (!key) {
       return new Response(JSON.stringify({ error: 'MISSING_GOOGLE_API_KEY' }), { status: 500 });
     }
@@ -22,7 +25,8 @@ export const onRequest: PagesFunction = async (ctx) => {
       `Text: """${q}"""`,
     ].join('\n');
 
-    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + encodeURIComponent(key), {
+    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=
+' + encodeURIComponent(key), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
