@@ -1,21 +1,22 @@
+<!-- index.html — FINAL (수정/보강용) -->
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>시장님 집무실 · 스마트 미러 PRO</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>시장님 집무실 · 스마트 미러 PRO</title>
 
-<!-- PWA -->
-<link rel="manifest" href="/manifest.webmanifest" />
-<link rel="icon" sizes="192x192" href="/icon-192.png" />
-<link rel="icon" sizes="512x512" href="/icon-512.png" />
-<meta name="theme-color" content="#0b0f19" />
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" sizes="192x192" href="/icon-192.png" />
+  <link rel="icon" sizes="512x512" href="/icon-512.png" />
+  <meta name="theme-color" content="#0b0f19" />
 
-<link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
 <main class="container">
-  <!-- 상단 인사/시계 -->
+  <!-- 상단 인사/시계 (기존 유지) -->
   <section class="hero">
     <div>
       <h1 id="greet">활기찬 하루입니다, 시장님</h1>
@@ -24,10 +25,10 @@
     <div class="clock" id="clock">--:--</div>
   </section>
 
-  <!-- 빠른 업무 트리거 (#trstart 유지) -->
+  <!-- 빠른 업무 트리거 (기존 유지: id=trstart 반드시 유지) -->
   <section id="trstart" class="card">
     <div class="title">업무 트리거 & 빠른 전환</div>
-    <div class="desc">대표/총괄실장 단축 패널입니다. 자주 쓰는 명령을 터치로 실행하세요.</div>
+    <div class="desc">자주 쓰는 명령을 터치로 실행하세요.</div>
     <div class="row">
       <button class="btn" onclick="
         document.getElementById('msgInput').value='내일 10시 복지과 회의 추가';
@@ -38,13 +39,13 @@
     </div>
   </section>
 
-  <!-- 오늘의 날씨 -->
+  <!-- 오늘의 날씨 (기존 유지) -->
   <section class="card">
     <header class="card-title">오늘의 날씨</header>
     <div id="weatherBox" class="weather">불러오는 중...</div>
   </section>
 
-  <!-- AI 비서 (채팅 + 음성) -->
+  <!-- AI 비서 (채팅 + 음성) (기존 유지) -->
   <section class="card">
     <header class="card-title">AI 비서 (채팅 + 음성)</header>
     <div id="chat" class="chat">
@@ -67,13 +68,13 @@
     <p class="hint">※ 특수문자/이모지/마크다운 등은 읽기 전에 자동 정리됩니다.</p>
   </section>
 
-  <!-- 오늘 일정 -->
+  <!-- 오늘 일정 (기존 유지) -->
   <section class="card">
     <header class="card-title">오늘 일정</header>
     <ul id="schedList" class="sched"></ul>
   </section>
 
-  <!-- 시정 뉴스 / 부서별 보고 -->
+  <!-- 시정 뉴스 / 부서별 보고 (기존 유지) -->
   <section class="grid">
     <div class="card">
       <header class="card-title">시정 뉴스</header>
@@ -85,9 +86,9 @@
     </div>
   </section>
 
-  <!-- 실시간 통역 (14개 언어) -->
+  <!-- 실시간 통역 (신규 보강: 14개 언어) -->
   <section class="card">
-    <header class="card-title">실시간 통역</header>
+    <header class="card-title">실시간 통역 (14개 언어)</header>
 
     <div class="row" style="gap:12px; align-items:center; flex-wrap:wrap">
       <label>입력(말하기)
@@ -129,32 +130,19 @@
     </div>
   </section>
 
-  <!-- 바닥 표시 -->
+  <!-- 바닥 표시 (기존 유지) -->
   <footer class="footer">© 논산시 스마트미러 · 루미나 PRO</footer>
 </main>
 
 <!-- 에러 배지 -->
 <style>
-.error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
+  .error-badge{position:fixed;right:12px;bottom:12px;background:#ff4d4f;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;display:none;z-index:9999}
 </style>
 <div id="errorBadge" class="error-badge">문제 감지 · 팀에 보고됨</div>
 
-<!-- 비서 로직(선행 제공된 /ai.js 사용). 없으면 안전 폴백 -->
+<!-- 비서/유틸 스크립트 -->
 <script src="/ai.js"></script>
-
 <script>
-/* ===== 폴백: TTS 안전 정리(sanitizeForTTS) – /ai.js에 없으면 이 버전 사용 ===== */
-if (!window.sanitizeForTTS) {
-  window.sanitizeForTTS = function (input) {
-    let s = String(input ?? '');
-    s = s.replace(/https?:\/\/\S+/g, '');                          // URL 제거
-    s = s.replace(/[\*\_\`\~\^\#\>\<\|\:\\\/\[\]\{\}\-]+/g, ' ');  // 마크다운/기호
-    try { s = s.replace(/\p{Extended_Pictographic}/gu, ''); } catch (e) {}
-    s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');            // 제어문자
-    return s.replace(/\s{2,}/g, ' ').trim();
-  };
-}
-
 /* ===== 공통 ===== */
 const $ = (s)=>document.querySelector(s);
 const chat = $('#chat'), input=$('#msgInput'), form=$('#chatForm');
@@ -230,65 +218,19 @@ form.addEventListener('submit', async (e)=>{
   }
 });
 
-/* ===== 날씨: 모바일 위치 → KMA 격자(nx,ny) 변환 후 호출 ===== */
-function latlonToGrid(lat, lon) {
-  // KMA LCC(기상청) 좌표계 변환 (nx, ny)
-  const RE=6371.00877, GRID=5.0, SLAT1=30.0, SLAT2=60.0, OLON=126.0, OLAT=38.0, XO=43, YO=136;
-  const DEGRAD=Math.PI/180.0;
-  const re=RE/GRID;
-  const slat1=SLAT1*DEGRAD, slat2=SLAT2*DEGRAD, olon=OLON*DEGRAD, olat=OLAT*DEGRAD;
-  let sn=Math.tan(Math.PI*0.25+slat2*0.5)/Math.tan(Math.PI*0.25+slat1*0.5);
-  sn=Math.log(Math.cos(slat1)/Math.cos(slat2))/Math.log(sn);
-  let sf=Math.tan(Math.PI*0.25+slat1*0.5);
-  sf=Math.pow(sf,sn)*Math.cos(slat1)/sn;
-  let ro=Math.tan(Math.PI*0.25+olat*0.5);
-  ro=re*sf/Math.pow(ro,sn);
-  let ra=Math.tan(Math.PI*0.25+(lat)*DEGRAD*0.5);
-  ra=re*sf/Math.pow(ra,sn);
-  let theta=lon*DEGRAD-olon;
-  if(theta>Math.PI) theta-=2.0*Math.PI;
-  if(theta<-Math.PI) theta+=2.0*Math.PI;
-  theta*=sn;
-  const nx=Math.floor(ra*Math.sin(theta)+XO+0.5);
-  const ny=Math.floor(ro-ra*Math.cos(theta)+YO+0.5);
-  return {nx, ny};
-}
-
+/* ===== 날씨 (기존 API에 맞춘 폴백) ===== */
 async function loadWeather(){
   try{
-    const setText = (t)=>($('#weatherBox').textContent=t);
-    // 위치 권한 시도
-    if (navigator.geolocation) {
-      await new Promise((resolve)=> {
-        navigator.geolocation.getCurrentPosition(async (pos)=>{
-          const {latitude, longitude}=pos.coords;
-          const {nx, ny}=latlonToGrid(latitude, longitude);
-          const res = await fetch(`/api/weather?nx=${nx}&ny=${ny}`).catch(()=>null);
-          if (res && res.ok) {
-            const data = await res.json();
-            setText(data?.summary || '현재 위치 기준 날씨를 불러올 수 없습니다.');
-          } else setText('날씨 API 응답이 없습니다.');
-          resolve();
-        }, async ()=>{
-          // 거부/실패 시 서울 기본 좌표
-          const res = await fetch(`/api/weather?nx=60&ny=127`).catch(()=>null);
-          if (res && res.ok) {
-            const data = await res.json();
-            setText(data?.summary || '날씨 정보를 불러올 수 없습니다.');
-          } else setText('날씨 정보를 불러올 수 없습니다.');
-          resolve();
-        }, {enableHighAccuracy:false, timeout:4000});
-      });
-    } else {
-      const res = await fetch(`/api/weather?nx=60&ny=127`);
-      const data = await res.json();
-      $('#weatherBox').textContent = data?.summary || '날씨 정보를 불러올 수 없습니다.';
-    }
+    const nx=60, ny=127; // 권한 거부 시 기본 좌표
+    const res = await fetch(`/api/weather?nx=${nx}&ny=${ny}`);
+    const data = await res.json();
+    const txt = data?.summary || '날씨 정보를 불러올 수 없습니다.';
+    $('#weatherBox').textContent = txt;
   }catch{ $('#weatherBox').textContent='날씨 정보를 불러올 수 없습니다.'; }
 }
 loadWeather();
 
-/* ===== 일정/뉴스/보고 ===== */
+/* ===== 일정/뉴스/보고 (기존 저장 데이터 로드) ===== */
 async function loadKV(listId, key){
   try{
     const res = await fetch(`/api/admin?list=${encodeURIComponent(key)}`);
@@ -313,97 +255,94 @@ loadKV('#schedList','SCHEDULE:TODAY');
 loadKV('#newsList','NEWS');
 loadKV('#deptList','DEPT');
 
-/* ===== 에러배지 & 최소 리포트 ===== */
+/* ===== 에러배지 ===== */
 window.addEventListener('error',()=>{$('#errorBadge').style.display='block';});
 window.addEventListener('unhandledrejection',()=>{$('#errorBadge').style.display='block';});
+</script>
 
-/* ===== 실시간 통역(14개) – STT→번역→TTS ===== */
-const trMap = {
-  ko:'ko-KR', en:'en-US', ja:'ja-JP', zh:'zh-CN',
-  fr:'fr-FR', de:'de-DE', es:'es-ES', pt:'pt-PT',
-  ru:'ru-RU', vi:'vi-VN', th:'th-TH', id:'id-ID',
-  ar:'ar-SA', hi:'hi-IN'
-};
-const trNames = {
-  ko:'Korean', en:'English', ja:'Japanese', zh:'Chinese',
-  fr:'French', de:'German', es:'Spanish', pt:'Portuguese',
-  ru:'Russian', vi:'Vietnamese', th:'Thai', id:'Indonesian',
-  ar:'Arabic', hi:'Hindi'
-};
+<!-- ===== 실시간 통역 바인딩 (14개 언어) ===== -->
+<script>
+(function(){
+  const trSrc = document.getElementById('trSrc');
+  const trDst = document.getElementById('trDst');
+  const trStart = document.getElementById('trStart');
+  const trStop = document.getElementById('trStop');
+  const trIn = document.getElementById('trIn');
+  const trOut = document.getElementById('trOut');
 
-const trSrc = $('#trSrc'), trDst = $('#trDst');
-const trStart = $('#trStart'), trStop = $('#trStop');
-const trIn = $('#trIn'), trOut = $('#trOut');
-const trTranslate = $('#trTranslate'), trSpeak = $('#trSpeak');
+  let trRec;
 
-let trRec;
-if ('webkitSpeechRecognition' in window) {
-  const R = window.webkitSpeechRecognition;
-  trRec = new R();
-  trRec.continuous = true;
-  trRec.interimResults = true;
-  trRec.onresult = (e)=>{
-    let final=''; let interim='';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) final += t + ' ';
-      else interim += t;
-    }
-    trIn.value = (final + interim).trim();
-  };
-  trRec.onerror = ()=> alert('통역 음성 인식 오류. 다시 시도해 주세요.');
-}
-
-trStart.onclick = ()=>{
-  if (!trRec) { alert('이 브라우저는 음성 인식을 지원하지 않습니다.'); return; }
-  try {
-    const lang = trMap[trSrc.value] || 'ko-KR';
-    trRec.lang = lang;
-    trRec.start();
-    trStart.disabled = true; trStop.disabled = false;
-  } catch {}
-};
-trStop.onclick = ()=>{
-  try { trRec && trRec.stop(); } catch {}
-  trStart.disabled = false; trStop.disabled = true;
-};
-
-async function translateText(text, src, dst) {
-  if (!text?.trim()) return '';
-  // 1) 전용 번역 API가 있으면 사용 (/api/translate)
-  try {
-    const r = await fetch('/api/translate', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ text, src, dst })
+  async function translateText(text, source, target){
+    const r = await fetch('/api/translate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ q:text, source, target })
     });
-    if (r.ok) return (await r.json())?.text || '';
-  } catch {}
-  // 2) 폴백: /api/ai 로 번역 프롬프트
-  const prompt = `Translate the following text from ${trNames[src]||src} to ${trNames[dst]||dst}. Only the translation.\n\n"${text}"`;
-  try {
-    const ans = await callAI(prompt);
-    return (ans||'').trim();
-  } catch {
-    return '';
+    if(!r.ok) throw new Error('번역 실패');
+    const data = await r.json();
+    return data.text;
   }
-}
 
-trTranslate.onclick = async ()=>{
-  const src = trSrc.value, dst = trDst.value;
-  trOut.value = '번역 중…';
-  const out = await translateText(trIn.value, src, dst);
-  trOut.value = out || '번역 결과가 없습니다.';
-};
+  function speakLang(text, lang){
+    const clean = (window.sanitizeForTTS ? window.sanitizeForTTS(text) : text) || '';
+    if(!clean) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    // 브라우저가 지원하는 언어코드로 매핑(간단 매핑)
+    const map = { zh:'zh-CN', ja:'ja-JP', ko:'ko-KR', en:'en-US', fr:'fr-FR', de:'de-DE', es:'es-ES',
+                  pt:'pt-PT', ru:'ru-RU', vi:'vi-VN', th:'th-TH', id:'id-ID', ar:'ar-SA', hi:'hi-IN' };
+    u.lang = map[lang] || lang;
+    window.speechSynthesis.speak(u);
+  }
 
-trSpeak.onclick = ()=>{
-  const line = window.sanitizeForTTS(trOut.value);
-  if (!line) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(line);
-  // 대상 언어 보이스 선택(가능한 경우)
-  u.lang = trMap[trDst.value] || 'en-US';
-  window.speechSynthesis.speak(u);
-};
+  function startSTT(lang){
+    if(!('webkitSpeechRecognition' in window)){
+      alert('이 브라우저는 음성 인식을 지원하지 않습니다.'); return;
+    }
+    const R = window.webkitSpeechRecognition;
+    trRec = new R();
+    const map = { zh:'zh-CN', ja:'ja-JP', ko:'ko-KR', en:'en-US', fr:'fr-FR', de:'de-DE', es:'es-ES',
+                  pt:'pt-PT', ru:'ru-RU', vi:'vi-VN', th:'th-TH', id:'id-ID', ar:'ar-SA', hi:'hi-IN' };
+    trRec.lang = map[lang] || 'ko-KR';
+    trRec.continuous = false;
+    trRec.interimResults = false;
+    trRec.onresult = async (e)=>{
+      const heard = e.results[0][0].transcript || '';
+      trIn.value = heard;
+      try{
+        const out = await translateText(heard, trSrc.value, trDst.value);
+        trOut.value = out;
+        speakLang(out, trDst.value);
+      }catch(err){
+        trOut.value = '번역 중 오류가 발생했습니다.';
+      }
+      trStop.disabled = true;
+      trStart.disabled = false;
+    };
+    trRec.onerror = ()=>{ trStop.disabled = true; trStart.disabled = false; };
+    trRec.onend = ()=>{ trStop.disabled = true; trStart.disabled = false; };
+    trRec.start();
+    trStart.disabled = true;
+    trStop.disabled = false;
+  }
+
+  trStart.addEventListener('click', ()=> startSTT(trSrc.value));
+  trStop.addEventListener('click', ()=> { try{ trRec && trRec.stop(); }catch(_){}
+    trStop.disabled = true; trStart.disabled = false; });
+
+  document.getElementById('trTranslate').addEventListener('click', async ()=>{
+    const text = trIn.value.trim(); if(!text) return;
+    try{
+      const out = await translateText(text, trSrc.value, trDst.value);
+      trOut.value = out;
+    }catch{ trOut.value = '번역 중 오류가 발생했습니다.'; }
+  });
+
+  document.getElementById('trSpeak').addEventListener('click', ()=>{
+    const text = trOut.value.trim(); if(!text) return;
+    speakLang(text, trDst.value);
+  });
+})();
 </script>
 </body>
 </html>
