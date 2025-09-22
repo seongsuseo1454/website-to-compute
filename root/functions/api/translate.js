@@ -1,53 +1,80 @@
 // /functions/api/translate.js
 export async function onRequest({ request, env }) {
   try {
-    const url = new URL(request.url);
-    if (request.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'method not allowed' }), { status: 405 });
+    const { method } = request;
+
+    // CORS/프리플라이트 (필요시)
+    if (method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'content-type',
+        }
+      });
     }
+
+    // 헬스체크: GET /api/translate?ping=1
+    if (method === 'GET') {
+      const url = new URL(request.url);
+      if (url.searchParams.get('ping')) {
+        return json({ ok: true, hasKey: !!env?.GEMINI_API_KEY });
+      }
+      return json({ error: 'method not allowed' }, 405);
+    }
+
+    if (method !== 'POST') return json({ error: 'method not allowed' }, 405);
 
     const { text, src = 'auto', dst = 'ko' } = await request.json().catch(() => ({}));
-    if (!text || typeof text !== 'string') {
-      return new Response(JSON.stringify({ error: 'no text' }), { status: 400 });
-    }
+    if (!text || typeof text !== 'string') return json({ error: 'no text' }, 400);
 
     const key = env && env.GEMINI_API_KEY;
-    if (!key) {
-      return new Response(JSON.stringify({ error: 'no api key' }), { status: 500 });
-    }
+    if (!key) return json({ error: 'no api key (GEMINI_API_KEY missing)' }, 500);
 
     const api = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
       + '?key=' + encodeURIComponent(key);
 
-    // 번역 전용 시스템 프롬프트: 결과는 순수 텍스트 한 줄
+    // 번역 전용 프롬프트 (결과는 순수 텍스트만)
     const sys = [
       'You are a translation engine.',
-      'Translate the user text from {{SRC}} to {{DST}}.',
-      'Return ONLY the translated sentence. No notes, no code block, no emojis.'
+      `Translate from ${src} to ${dst}.`,
+      'Return ONLY the translated sentence. No notes, no markdown, no code block.'
     ].join(' ');
-    const prompt = sys.replace('{{SRC}}', src).replace('{{DST}}', dst);
 
     const res = await fetch(api, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [
-          { role: 'user', parts: [{ text: prompt }] },
+          { role: 'user', parts: [{ text: sys }] },
           { role: 'user', parts: [{ text }] }
         ]
       })
     });
 
     if (!res.ok) {
-      return new Response(JSON.stringify({ error: 'upstream ' + res.status }), { status: 200 });
+      return json({ error: `upstream ${res.status}` }, 200);
     }
+
     const data = await res.json().catch(() => ({}));
     const translated =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      '';
+      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
-    return new Response(JSON.stringify({ translated }), { status: 200 });
+    if (!translated) {
+      return json({ error: 'empty response from model' }, 200);
+    }
+
+    return json({ translated }, 200);
+
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500 });
+    return json({ error: String(e) }, 500);
   }
+}
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+  });
 }
