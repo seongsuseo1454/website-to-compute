@@ -25,8 +25,7 @@ export const onRequest: PagesFunction = async (ctx) => {
       `Text: """${q}"""`,
     ].join('\n');
 
-    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=
-' + encodeURIComponent(key), {
+    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + encodeURIComponent(key), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
