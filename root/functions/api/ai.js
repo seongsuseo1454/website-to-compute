@@ -15,8 +15,7 @@ export async function onRequest({ request, env }) {
     }
 
     const url =
-      "https://generativelanguage.googleapis.com/v1beta/models/
-" +
+      "https://generativelanguage.googleapis.com/v1beta/models/" +
       "gemini-1.5-flash:generateContent?key=" +
       encodeURIComponent(key);
 
