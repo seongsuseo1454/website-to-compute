@@ -17,21 +17,20 @@ export async function onRequest({ request, env }: { request: Request; env: any }
 
     // 3. Google Gemini API 호출
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=
-${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: prompt }]
-            }
-          ]
-        })
-      }
-    );
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }]
+        }
+      ]
+    })
+  }
+);
 
     if (!res.ok) {
       return Response.json({ text: 'AI 응답 오류 · 상태코드 ' + res.status }, { status: res.status });
