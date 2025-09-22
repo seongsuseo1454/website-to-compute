@@ -16,9 +16,6 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
      }
   );
 
-  
-
-
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
       return json({ text: 'AI 응답 오류 · 상태코드 ' + res.status, detail }, res.status);
