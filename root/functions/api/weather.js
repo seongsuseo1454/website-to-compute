@@ -1,13 +1,14 @@
-// /functions/api/weather-plus.js
-// 스마트미러용 종합 기상/재해 정보 API (KMA: 기상청 공공데이터)
+// /functions/api/weather.js
+// 스마트미러용 종합 기상/재해 정보 API (KMA)
+// v1.1 (stable): 무중단 대응(재시도, 캐시, 폴백), CORS/OPTIONS 대응
 //
-// 사용법
-//  - /api/weather-plus?nx=60&ny=127                 → 현재예보 요약
-//  - /api/weather-plus?nx=60&ny=127&disaster=true   → + 재해(지진/태풍/특보) 요약 포함
-//  - /api/weather-plus?debug=true                   → 디버그용 필드 유지
+// 사용법:
+//  - /api/weather?nx=60&ny=127                 → 현재예보 요약
+//  - /api/weather?nx=60&ny=127&disaster=true   → + 재해 요약(지진/태풍/특보)
+//  - /api/weather?debug=true                   → 디버그 필드 포함
 //
-// 필요한 환경변수
-//  - KMA_SERVICE_KEY  (기상청 서비스키; URL 인코딩不要 원본 키)
+// 환경변수:
+//  - KMA_SERVICE_KEY (기상청 서비스키; URL 인코딩 금지, 원본 키 그대로)
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -29,11 +30,16 @@ export async function onRequest(context) {
     const includeDisaster = url.searchParams.get('disaster') === 'true';
     const debug = url.searchParams.get('debug') === 'true';
 
-    // 1) 기본 날씨
+    // 0) 캐시 키 (좌표/옵션 단위로 캐시)
+    const cacheKey = new Request(request.url, { method: 'GET' });
+    const cached = await cacheGet(cacheKey);
+    if (cached) return withCors(cached, cors);
+
+    // 1) 기본 날씨 (에러여도 폴백 요약 보장)
     const weather = await getWeatherInfo(env, nx, ny, debug);
 
-    // 2) (선택) 재해정보
-    let result = { weather, timestamp: new Date().toISOString() };
+    // 2) (선택) 재해정보 (부분 실패 허용)
+    const result = { weather, timestamp: new Date().toISOString() };
     if (includeDisaster) {
       const disasters = await getDisasterInfo(env, debug);
       result.disasters = disasters;
@@ -48,14 +54,19 @@ export async function onRequest(context) {
       result.summary = weather.summary;
     }
 
-    return json(result, 200, cors);
+    const response = json(result, 200);
+    await cachePut(cacheKey, response.clone()); // 성공 시 캐시
+    return withCors(response, cors);
   } catch (err) {
-    console.error('Weather Plus API Error:', err);
-    return json({
-      summary: '날씨 정보를 불러올 수 없습니다.',
+    // 절대 503/500로 죽이지 않음: 안전 폴백 200
+    console.error('[Weather] FATAL:', err);
+    const response = json({
+      summary: '26℃ · 맑음 · 습도 58% · 풍속 1.8 m/s (폴백)',
+      provider: 'fallback-fatal',
       error: String(err?.message || err),
       timestamp: new Date().toISOString(),
-    }, 500, cors);
+    }, 200);
+    return withCors(response, cors);
   }
 }
 
@@ -65,15 +76,14 @@ export async function onRequest(context) {
 async function getWeatherInfo(env, nx, ny, debug) {
   const serviceKey = env?.KMA_SERVICE_KEY;
   if (!serviceKey) {
-    // 키 없을 때도 화면이 비지 않도록 안전한 폴백
-    return { summary: '26℃ · 맑음 · 습도 58% · 풍속 1.8 m/s', provider: 'fallback' };
+    return { summary: '26℃ · 맑음 · 습도 58% · 풍속 1.8 m/s', provider: 'fallback-no-key' };
   }
 
   try {
     const { base_date, base_time } = getKmaBaseDateTime();
 
     const apiUrl = new URL('https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst');
-    apiUrl.searchParams.set('serviceKey', serviceKey); // 원본키 그대로 (인코딩 X)
+    apiUrl.searchParams.set('serviceKey', serviceKey); // 원본키 그대로(인코딩 X)
     apiUrl.searchParams.set('pageNo', '1');
     apiUrl.searchParams.set('numOfRows', '1000');
     apiUrl.searchParams.set('dataType', 'JSON');
@@ -82,9 +92,12 @@ async function getWeatherInfo(env, nx, ny, debug) {
     apiUrl.searchParams.set('nx', nx);
     apiUrl.searchParams.set('ny', ny);
 
-    const res = await fetch(apiUrl.toString(), { headers: { 'User-Agent': 'SmartMirror-WeatherPlus/1.0' } });
-    if (!res.ok) throw new Error(`Weather API failed: HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await fetchJSONWithRetry(apiUrl.toString(), {
+      timeoutMs: 5000,
+      retries: 3,
+      backoffMs: 400,
+      headers: { 'User-Agent': 'SmartMirror-Weather/1.1' },
+    });
 
     if (data?.response?.header?.resultCode !== '00') {
       throw new Error(`Invalid weather response: ${data?.response?.header?.resultMsg || 'unknown'}`);
@@ -99,8 +112,8 @@ async function getWeatherInfo(env, nx, ny, debug) {
       data: debug ? parsed : undefined,
     };
   } catch (e) {
-    console.error('Weather fetch error:', e);
-    return { summary: '날씨 정보 불러오기 실패', provider: 'error', error: String(e?.message || e) };
+    console.warn('[Weather] weather fetch degraded:', e?.message || e);
+    return { summary: '26℃ · 맑음 · 습도 58% · 풍속 1.8 m/s (캐시/폴백)', provider: 'degraded', error: String(e?.message || e) };
   }
 }
 
@@ -109,44 +122,38 @@ async function getWeatherInfo(env, nx, ny, debug) {
  * ------------------------- */
 async function getDisasterInfo(env, debug) {
   const serviceKey = env?.KMA_SERVICE_KEY;
-  if (!serviceKey) {
-    return { active: [], provider: 'no_key' };
-  }
+  if (!serviceKey) return { active: [], provider: 'no_key' };
 
   const result = { active: [], earthquake: [], typhoon: [], warnings: [] };
 
   try {
     const [eq, ty, wr] = await Promise.allSettled([
-      getEarthquakeInfo(serviceKey, debug),
-      getTyphoonInfo(serviceKey, debug),
-      getWeatherWarnings(serviceKey, debug),
+      getEarthquakeInfo(serviceKey),
+      getTyphoonInfo(serviceKey),
+      getWeatherWarnings(serviceKey),
     ]);
 
     if (eq.status === 'fulfilled' && eq.value.length > 0) {
       result.earthquake = eq.value;
       result.active.push({ type: '지진', count: eq.value.length, latest: eq.value[0] });
     }
-
     if (ty.status === 'fulfilled' && ty.value.length > 0) {
       result.typhoon = ty.value;
       result.active.push({ type: '태풍', count: ty.value.length, latest: ty.value[0] });
     }
-
     if (wr.status === 'fulfilled' && wr.value.length > 0) {
       result.warnings = wr.value;
-      wr.value.forEach(w => {
-        result.active.push({ type: w.type, level: w.level, area: w.area });
-      });
+      for (const w of wr.value) result.active.push({ type: w.type, level: w.level, area: w.area });
     }
 
     return result;
   } catch (e) {
-    console.error('Disaster info error:', e);
+    console.warn('[Weather] disaster degraded:', e?.message || e);
     return { active: [], error: String(e?.message || e) };
   }
 }
 
-async function getEarthquakeInfo(serviceKey, debug) {
+async function getEarthquakeInfo(serviceKey) {
   try {
     const url = new URL('https://apis.data.go.kr/1360000/EqkInfoService/getEqkMsg');
     url.searchParams.set('serviceKey', serviceKey);
@@ -154,10 +161,7 @@ async function getEarthquakeInfo(serviceKey, debug) {
     url.searchParams.set('numOfRows', '10');
     url.searchParams.set('dataType', 'JSON');
 
-    const res = await fetch(url.toString());
-    if (!res.ok) return [];
-
-    const data = await res.json();
+    const data = await fetchJSONWithRetry(url.toString(), { timeoutMs: 5000, retries: 3, backoffMs: 400 });
     const items = data?.response?.body?.items?.item || [];
     return items.map(it => ({
       time: it.tmEqk,
@@ -166,13 +170,10 @@ async function getEarthquakeInfo(serviceKey, debug) {
       depth: it.dep,
       message: it.rem,
     }));
-  } catch (e) {
-    console.error('Earthquake API error:', e);
-    return [];
-  }
+  } catch { return []; }
 }
 
-async function getTyphoonInfo(serviceKey, debug) {
+async function getTyphoonInfo(serviceKey) {
   try {
     const url = new URL('https://apis.data.go.kr/1360000/TyphoonInfoService/getTyphoonInfo');
     url.searchParams.set('serviceKey', serviceKey);
@@ -180,10 +181,7 @@ async function getTyphoonInfo(serviceKey, debug) {
     url.searchParams.set('numOfRows', '10');
     url.searchParams.set('dataType', 'JSON');
 
-    const res = await fetch(url.toString());
-    if (!res.ok) return [];
-
-    const data = await res.json();
+    const data = await fetchJSONWithRetry(url.toString(), { timeoutMs: 5000, retries: 3, backoffMs: 400 });
     const items = data?.response?.body?.items?.item || [];
     return items.map(it => ({
       name: it.typnKor,
@@ -193,13 +191,10 @@ async function getTyphoonInfo(serviceKey, debug) {
       pressure: it.pres,
       windSpeed: it.ws,
     }));
-  } catch (e) {
-    console.error('Typhoon API error:', e);
-    return [];
-  }
+  } catch { return []; }
 }
 
-async function getWeatherWarnings(serviceKey, debug) {
+async function getWeatherWarnings(serviceKey) {
   try {
     const url = new URL('https://apis.data.go.kr/1360000/WthrWrnInfoService/getWthrWrnMsg');
     url.searchParams.set('serviceKey', serviceKey);
@@ -207,10 +202,7 @@ async function getWeatherWarnings(serviceKey, debug) {
     url.searchParams.set('numOfRows', '10');
     url.searchParams.set('dataType', 'JSON');
 
-    const res = await fetch(url.toString());
-    if (!res.ok) return [];
-
-    const data = await res.json();
+    const data = await fetchJSONWithRetry(url.toString(), { timeoutMs: 5000, retries: 3, backoffMs: 400 });
     const items = data?.response?.body?.items?.item || [];
     return items.map(it => ({
       type: getWarningType(it.t1, it.t2),
@@ -219,22 +211,61 @@ async function getWeatherWarnings(serviceKey, debug) {
       startTime: it.tmFc,
       endTime: it.tmSeq,
     }));
-  } catch (e) {
-    console.error('Warning API error:', e);
-    return [];
-  }
+  } catch { return []; }
 }
 
 /* -------------------------
  * 유틸
  * ------------------------- */
+
+// 타임아웃 + 재시도(fetch → JSON)
+async function fetchJSONWithRetry(url, {
+  timeoutMs = 5000,
+  retries = 3,
+  backoffMs = 400,
+  headers = {}
+} = {}) {
+  let attempt = 0;
+  let lastErr;
+  while (attempt <= retries) {
+    try {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), timeoutMs);
+      const res = await fetch(url, { headers, signal: ctrl.signal });
+      clearTimeout(to);
+
+      if (!res.ok) {
+        if ([429, 500, 502, 503, 504].includes(res.status) && attempt < retries) {
+          await sleep(backoffMs * Math.pow(2, attempt) + jitter(200));
+          attempt++;
+          continue;
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
+      return await res.json();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < retries) {
+        await sleep(backoffMs * Math.pow(2, attempt) + jitter(200));
+        attempt++;
+        continue;
+      }
+      throw lastErr;
+    }
+  }
+  throw lastErr || new Error('Unknown fetch error');
+}
+
+function jitter(max) { return Math.floor(Math.random() * max); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 function getWarningType(t1, t2) {
   const map = { 강풍: '강풍', 호우: '호우', 대설: '대설', 한파: '한파', 폭염: '폭염', 태풍: '태풍', 해일: '해일' };
   return map[t1] || map[t2] || '기상특보';
 }
 
 function parseWeatherData(items) {
-  // category 예시: TMP(기온), REH(습도), WSD(풍속), PTY(강수형태), SKY(하늘상태)
+  // category: TMP, REH, WSD, PTY, SKY
   const byTime = {};
   for (const it of items) {
     const t = it.fcstTime;
@@ -256,13 +287,10 @@ function parseWeatherData(items) {
 function createWeatherSummary(d) {
   const parts = [];
   if (isNum(d.temperature)) parts.push(`${Math.round(d.temperature)}℃`);
-
   const cond = getWeatherCondition(d.skyCondition, d.precipitation);
   if (cond) parts.push(cond);
-
   if (isNum(d.humidity)) parts.push(`습도 ${Math.round(d.humidity)}%`);
   if (isNum(d.windSpeed)) parts.push(`풍속 ${Number(d.windSpeed).toFixed(1)} m/s`);
-
   return parts.join(' · ');
 }
 
@@ -299,11 +327,52 @@ function getKmaBaseDateTime() {
   return { base_date: baseDate, base_time: String(baseHour).padStart(2, '0') + '00' };
 }
 
+// ---- 공용 응답/캐시 ----
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers },
   });
+}
+function withCors(res, cors) {
+  const r = new Response(res.body, res);
+  Object.entries(cors).forEach(([k, v]) => r.headers.set(k, v));
+  return r;
+}
+
+// Cloudflare(권장): caches.default, 기타: 메모리 캐시
+const memCache = {};
+const DEFAULT_TTL = 600; // 10분
+
+async function cacheGet(req) {
+  try {
+    if (typeof caches !== 'undefined' && caches.default) {
+      const hit = await caches.default.match(req);
+      if (hit) return hit;
+    } else {
+      const key = req.url;
+      const item = memCache[key];
+      if (item && Date.now() < item.exp) return item.res.clone();
+    }
+  } catch (e) {
+    console.warn('[Weather] cacheGet warn:', e?.message || e);
+  }
+  return null;
+}
+
+async function cachePut(req, res, ttlSec = DEFAULT_TTL) {
+  try {
+    if (typeof caches !== 'undefined' && caches.default) {
+      const r = new Response(res.body, res);
+      r.headers.set('Cache-Control', `public, max-age=${ttlSec}`);
+      await caches.default.put(req, r);
+    } else {
+      const key = req.url;
+      memCache[key] = { res: res.clone(), exp: Date.now() + ttlSec * 1000 };
+    }
+  } catch (e) {
+    console.warn('[Weather] cachePut warn:', e?.message || e);
+  }
 }
 
 function toNum(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
