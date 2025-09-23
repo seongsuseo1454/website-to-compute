@@ -1,171 +1,310 @@
-// /functions/api/weather.js
-// 스마트미러용 날씨 API (KMA 실사용 + 안전 폴백)
-// - 기본: 요약 문자열(summary) 반환 (UI는 이 문자열만 표시해도 OK)
-// - 쿼리: ?nx=60&ny=127&provider=kma  (provider 생략 시 데모/폴백)
-// - 환경변수: KMA_SERVICE_KEY  (기상청 인증키; URL 인코딩 불필요한 "디코드된 키"가 권장)
+// /functions/api/weather-plus.js
+// 스마트미러용 종합 기상/재해 정보 API (KMA: 기상청 공공데이터)
+//
+// 사용법
+//  - /api/weather-plus?nx=60&ny=127                 → 현재예보 요약
+//  - /api/weather-plus?nx=60&ny=127&disaster=true   → + 재해(지진/태풍/특보) 요약 포함
+//  - /api/weather-plus?debug=true                   → 디버그용 필드 유지
+//
+// 필요한 환경변수
+//  - KMA_SERVICE_KEY  (기상청 서비스키; URL 인코딩不要 원본 키)
 
-export async function onRequest({ request, env }) {
-  // 공통 CORS 헤더
+export async function onRequest(context) {
+  const { request, env } = context;
+
+  // --- 공통 CORS ---
   const cors = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: cors });
+  }
+
   try {
-    const u = new URL(request.url);
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: cors });
-    }
+    const url = new URL(request.url);
+    const nx = url.searchParams.get('nx') || '60';
+    const ny = url.searchParams.get('ny') || '127';
+    const includeDisaster = url.searchParams.get('disaster') === 'true';
+    const debug = url.searchParams.get('debug') === 'true';
 
-    const nx = u.searchParams.get('nx') || '60';
-    const ny = u.searchParams.get('ny') || '127';
-    const provider = (u.searchParams.get('provider') || '').toLowerCase();
+    // 1) 기본 날씨
+    const weather = await getWeatherInfo(env, nx, ny, debug);
 
-    // ---- 1) KMA(기상청) 실데이터 시도 ----
-    const KMA_KEY = env?.KMA_SERVICE_KEY; // ex) 기상청 "서비스키"
-    if (provider === 'kma' && KMA_KEY) {
-      try {
-        const { base_date, base_time } = computeKmaBaseDateTimeKST();
-        // 단기예보(VilageFcst) JSON
-        const qs = new URLSearchParams({
-          serviceKey: KMA_KEY, // Cloudflare가 자동 인코딩하므로 원키 권장
-          pageNo: '1',
-          numOfRows: '1000',
-          dataType: 'JSON',
-          base_date,
-          base_time,
-          nx: String(nx),
-          ny: String(ny),
-        });
-        const kmaUrl = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?${qs}`;
+    // 2) (선택) 재해정보
+    let result = { weather, timestamp: new Date().toISOString() };
+    if (includeDisaster) {
+      const disasters = await getDisasterInfo(env, debug);
+      result.disasters = disasters;
 
-        const res = await fetch(kmaUrl, { method: 'GET' });
-        if (!res.ok) throw new Error('KMA HTTP ' + res.status);
-        const data = await res.json();
-
-        // 응답 파싱
-        const items = data?.response?.body?.items?.item || [];
-        const nowPick = pickKmaForecast(items);
-        const summary = composeSummary(nowPick) || '날씨 정보를 불러올 수 없습니다.';
-
-        return json({ summary, provider: 'kma', base_date, base_time }, 200, cors);
-      } catch (e) {
-        // KMA 실패 시 폴백 계속 수행
+      if (disasters.active?.length > 0) {
+        const alertSummary = disasters.active.map(d => d.type).join(', ');
+        result.summary = `⚠️ ${alertSummary} | ${weather.summary}`;
+      } else {
+        result.summary = `✅ 특보 없음 | ${weather.summary}`;
       }
+    } else {
+      result.summary = weather.summary;
     }
 
-    // ---- 2) 폴백(데모/키 없음/실패) ----
-    const fallback = `26℃ · 습도 58% · 풍속 1.8 m/s (기본 위치 ${nx},${ny})`;
-    return json({ summary: fallback, provider: 'fallback' }, 200, cors);
-  } catch (_e) {
-    return json({ summary: '날씨 정보를 불러올 수 없습니다.' }, 200, cors);
+    return json(result, 200, cors);
+  } catch (err) {
+    console.error('Weather Plus API Error:', err);
+    return json({
+      summary: '날씨 정보를 불러올 수 없습니다.',
+      error: String(err?.message || err),
+      timestamp: new Date().toISOString(),
+    }, 500, cors);
   }
 }
 
-/* ===== 유틸 ===== */
-
-// KST(한국시간) 기준으로 기상청 단기예보 base_time 계산
-// 단기예보는 02,05,08,11,14,17,20,23시에 생성됨
-function computeKmaBaseDateTimeKST() {
-  // Cloudflare 런타임은 기본 UTC. 한국시간(KST=UTC+9)으로 보정.
-  const nowUTC = new Date();
-  const kst = new Date(nowUTC.getTime() + 9 * 60 * 60 * 1000);
-
-  const y = kst.getFullYear();
-  const m = String(kst.getMonth() + 1).padStart(2, '0');
-  const d = String(kst.getDate()).padStart(2, '0');
-
-  const hours = kst.getHours();
-  // 가용 근사: 현재시간보다 가장 근접한 직전 생성시각
-  const slots = [2, 5, 8, 11, 14, 17, 20, 23];
-  let baseH = slots[0];
-  for (const h of slots) {
-    if (hours >= h) baseH = h;
+/* -------------------------
+ * 1) 기본 날씨 (동네예보)
+ * ------------------------- */
+async function getWeatherInfo(env, nx, ny, debug) {
+  const serviceKey = env?.KMA_SERVICE_KEY;
+  if (!serviceKey) {
+    // 키 없을 때도 화면이 비지 않도록 안전한 폴백
+    return { summary: '26℃ · 맑음 · 습도 58% · 풍속 1.8 m/s', provider: 'fallback' };
   }
 
-  // 자정~01시대에 호출되면 전날 23시로 밀리는 처리
-  let baseDate = `${y}${m}${d}`;
-  if (hours < 2) {
-    const prev = new Date(kst.getTime() - 24 * 60 * 60 * 1000);
-    const py = prev.getFullYear();
-    const pm = String(prev.getMonth() + 1).padStart(2, '0');
-    const pd = String(prev.getDate()).padStart(2, '0');
-    baseDate = `${py}${pm}${pd}`;
-    baseH = 23;
-  }
+  try {
+    const { base_date, base_time } = getKmaBaseDateTime();
 
-  const baseTime = String(baseH).padStart(2, '0') + '00';
-  return { base_date: baseDate, base_time: baseTime };
+    const apiUrl = new URL('https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst');
+    apiUrl.searchParams.set('serviceKey', serviceKey); // 원본키 그대로 (인코딩 X)
+    apiUrl.searchParams.set('pageNo', '1');
+    apiUrl.searchParams.set('numOfRows', '1000');
+    apiUrl.searchParams.set('dataType', 'JSON');
+    apiUrl.searchParams.set('base_date', base_date);
+    apiUrl.searchParams.set('base_time', base_time);
+    apiUrl.searchParams.set('nx', nx);
+    apiUrl.searchParams.set('ny', ny);
+
+    const res = await fetch(apiUrl.toString(), { headers: { 'User-Agent': 'SmartMirror-WeatherPlus/1.0' } });
+    if (!res.ok) throw new Error(`Weather API failed: HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (data?.response?.header?.resultCode !== '00') {
+      throw new Error(`Invalid weather response: ${data?.response?.header?.resultMsg || 'unknown'}`);
+    }
+
+    const items = data?.response?.body?.items?.item || [];
+    const parsed = parseWeatherData(items);
+
+    return {
+      summary: createWeatherSummary(parsed),
+      provider: 'kma',
+      data: debug ? parsed : undefined,
+    };
+  } catch (e) {
+    console.error('Weather fetch error:', e);
+    return { summary: '날씨 정보 불러오기 실패', provider: 'error', error: String(e?.message || e) };
+  }
 }
 
-// 기상청 카테고리에서 우리가 쓸 값 추출
-// T1H(기온, 초단기예보) 대신 단기예보는 TMP, WSD, REH, SKY/PTY 조합 사용
-function pickKmaForecast(items) {
-  // 같은 fcstTime의 값이 여러 개 있을 수 있으니, 가장 가까운 시간대 하나 고르기
-  // 여기선 단순히 첫 fcstTime을 기준으로 묶음
-  const byTime = new Map();
+/* -------------------------
+ * 2) 재해정보 (지진/태풍/특보)
+ * ------------------------- */
+async function getDisasterInfo(env, debug) {
+  const serviceKey = env?.KMA_SERVICE_KEY;
+  if (!serviceKey) {
+    return { active: [], provider: 'no_key' };
+  }
+
+  const result = { active: [], earthquake: [], typhoon: [], warnings: [] };
+
+  try {
+    const [eq, ty, wr] = await Promise.allSettled([
+      getEarthquakeInfo(serviceKey, debug),
+      getTyphoonInfo(serviceKey, debug),
+      getWeatherWarnings(serviceKey, debug),
+    ]);
+
+    if (eq.status === 'fulfilled' && eq.value.length > 0) {
+      result.earthquake = eq.value;
+      result.active.push({ type: '지진', count: eq.value.length, latest: eq.value[0] });
+    }
+
+    if (ty.status === 'fulfilled' && ty.value.length > 0) {
+      result.typhoon = ty.value;
+      result.active.push({ type: '태풍', count: ty.value.length, latest: ty.value[0] });
+    }
+
+    if (wr.status === 'fulfilled' && wr.value.length > 0) {
+      result.warnings = wr.value;
+      wr.value.forEach(w => {
+        result.active.push({ type: w.type, level: w.level, area: w.area });
+      });
+    }
+
+    return result;
+  } catch (e) {
+    console.error('Disaster info error:', e);
+    return { active: [], error: String(e?.message || e) };
+  }
+}
+
+async function getEarthquakeInfo(serviceKey, debug) {
+  try {
+    const url = new URL('https://apis.data.go.kr/1360000/EqkInfoService/getEqkMsg');
+    url.searchParams.set('serviceKey', serviceKey);
+    url.searchParams.set('pageNo', '1');
+    url.searchParams.set('numOfRows', '10');
+    url.searchParams.set('dataType', 'JSON');
+
+    const res = await fetch(url.toString());
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const items = data?.response?.body?.items?.item || [];
+    return items.map(it => ({
+      time: it.tmEqk,
+      location: it.loc,
+      magnitude: it.mag,
+      depth: it.dep,
+      message: it.rem,
+    }));
+  } catch (e) {
+    console.error('Earthquake API error:', e);
+    return [];
+  }
+}
+
+async function getTyphoonInfo(serviceKey, debug) {
+  try {
+    const url = new URL('https://apis.data.go.kr/1360000/TyphoonInfoService/getTyphoonInfo');
+    url.searchParams.set('serviceKey', serviceKey);
+    url.searchParams.set('pageNo', '1');
+    url.searchParams.set('numOfRows', '10');
+    url.searchParams.set('dataType', 'JSON');
+
+    const res = await fetch(url.toString());
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const items = data?.response?.body?.items?.item || [];
+    return items.map(it => ({
+      name: it.typnKor,
+      number: it.typnSeq,
+      status: it.typnSt,
+      position: `${it.lat}, ${it.lon}`,
+      pressure: it.pres,
+      windSpeed: it.ws,
+    }));
+  } catch (e) {
+    console.error('Typhoon API error:', e);
+    return [];
+  }
+}
+
+async function getWeatherWarnings(serviceKey, debug) {
+  try {
+    const url = new URL('https://apis.data.go.kr/1360000/WthrWrnInfoService/getWthrWrnMsg');
+    url.searchParams.set('serviceKey', serviceKey);
+    url.searchParams.set('pageNo', '1');
+    url.searchParams.set('numOfRows', '10');
+    url.searchParams.set('dataType', 'JSON');
+
+    const res = await fetch(url.toString());
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const items = data?.response?.body?.items?.item || [];
+    return items.map(it => ({
+      type: getWarningType(it.t1, it.t2),
+      level: it.lvl,
+      area: it.re,
+      startTime: it.tmFc,
+      endTime: it.tmSeq,
+    }));
+  } catch (e) {
+    console.error('Warning API error:', e);
+    return [];
+  }
+}
+
+/* -------------------------
+ * 유틸
+ * ------------------------- */
+function getWarningType(t1, t2) {
+  const map = { 강풍: '강풍', 호우: '호우', 대설: '대설', 한파: '한파', 폭염: '폭염', 태풍: '태풍', 해일: '해일' };
+  return map[t1] || map[t2] || '기상특보';
+}
+
+function parseWeatherData(items) {
+  // category 예시: TMP(기온), REH(습도), WSD(풍속), PTY(강수형태), SKY(하늘상태)
+  const byTime = {};
   for (const it of items) {
-    const key = it.fcstTime;
-    if (!byTime.has(key)) byTime.set(key, []);
-    byTime.get(key).push(it);
+    const t = it.fcstTime;
+    if (!byTime[t]) byTime[t] = {};
+    byTime[t][it.category] = it.fcstValue;
   }
-  // 첫 시간대 레코드
-  const [firstTime] = byTime.keys();
-  const arr = byTime.get(firstTime) || [];
+  const times = Object.keys(byTime).sort();
+  const d = byTime[times[0]] || {};
 
-  const pick = {};
-  for (const it of arr) {
-    pick[it.category] = it.fcstValue;
-  }
-  // TMP=기온(℃), REH=습도(%), WSD=풍속(m/s), SKY(1~4), PTY(강수형태)
   return {
-    tmp: safeNum(pick.TMP), // ℃
-    reh: safeNum(pick.REH), // %
-    wsd: safeNum(pick.WSD), // m/s
-    sky: pick.SKY,          // 1~4
-    pty: pick.PTY,          // 0: 없음
+    temperature: toNum(d.TMP),
+    humidity: toNum(d.REH),
+    windSpeed: toNum(d.WSD),
+    skyCondition: d.SKY ?? null,
+    precipitation: d.PTY ?? '0',
   };
 }
 
-function composeSummary({ tmp, reh, wsd, sky, pty } = {}) {
-  if (tmp == null && reh == null && wsd == null) return '';
-  const skyTxt = skyToText(sky, pty);
+function createWeatherSummary(d) {
   const parts = [];
-  if (typeof tmp === 'number') parts.push(`${tmp}℃`);
-  if (typeof reh === 'number') parts.push(`습도 ${reh}%`);
-  if (typeof wsd === 'number') parts.push(`풍속 ${wsd} m/s`);
-  if (skyTxt) parts.push(skyTxt);
+  if (isNum(d.temperature)) parts.push(`${Math.round(d.temperature)}℃`);
+
+  const cond = getWeatherCondition(d.skyCondition, d.precipitation);
+  if (cond) parts.push(cond);
+
+  if (isNum(d.humidity)) parts.push(`습도 ${Math.round(d.humidity)}%`);
+  if (isNum(d.windSpeed)) parts.push(`풍속 ${Number(d.windSpeed).toFixed(1)} m/s`);
+
   return parts.join(' · ');
 }
 
-function skyToText(sky, pty) {
-  // PTY: 0 없음, 1 비, 2 비/눈, 3 눈, 4 소나기
+function getWeatherCondition(sky, pty) {
   if (pty && pty !== '0') {
-    switch (String(pty)) {
-      case '1': return '비';
-      case '2': return '비/눈';
-      case '3': return '눈';
-      case '4': return '소나기';
-      default: return '강수';
-    }
+    const types = { '1': '비', '2': '비/눈', '3': '눈', '4': '소나기' };
+    return types[pty] || '강수';
   }
-  // SKY: 1 맑음, 3 구름많음, 4 흐림 (단기예보 스펙)
-  switch (String(sky)) {
-    case '1': return '맑음';
-    case '3': return '구름 많음';
-    case '4': return '흐림';
-    default: return '';
-  }
+  const skyTypes = { '1': '맑음', '3': '구름많음', '4': '흐림' };
+  return skyTypes[sky] || '';
 }
 
-function safeNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : undefined;
+function getKmaBaseDateTime() {
+  // KST 기준, 발표시각(02,05,08,11,14,17,20,23) 중 직전 값 사용
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const y = kst.getFullYear();
+  const m = String(kst.getMonth() + 1).padStart(2, '0');
+  const d = String(kst.getDate()).padStart(2, '0');
+  const h = kst.getHours();
+
+  const slots = [2, 5, 8, 11, 14, 17, 20, 23];
+  let baseHour = 23;
+  let baseDate = `${y}${m}${d}`;
+
+  for (let i = slots.length - 1; i >= 0; i--) {
+    if (h >= slots[i]) { baseHour = slots[i]; break; }
+  }
+  if (h < 2) {
+    const yst = new Date(kst.getTime() - 24 * 60 * 60 * 1000);
+    baseDate = `${yst.getFullYear()}${String(yst.getMonth() + 1).padStart(2, '0')}${String(yst.getDate()).padStart(2, '0')}`;
+    baseHour = 23;
+  }
+  return { base_date: baseDate, base_time: String(baseHour).padStart(2, '0') + '00' };
 }
 
-function json(obj, status = 200, headers = {}) {
-  return new Response(JSON.stringify(obj), {
+function json(data, status = 200, headers = {}) {
+  return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers },
   });
 }
+
+function toNum(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+function isNum(v) { return typeof v === 'number' && Number.isFinite(v); }
